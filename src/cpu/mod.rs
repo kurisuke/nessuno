@@ -7,12 +7,12 @@ use std::num::Wrapping;
 pub struct Cpu {
     bus: Box<dyn Bus>,
 
-    a: u8,      // accumulator register
-    x: u8,      // X register
-    y: u8,      // Y register
-    stkp: u8,   // stack pointer (points to location on bus)
-    pc: u16,    // program counter
-    status: u8, // status register
+    pub a: u8,      // accumulator register
+    pub x: u8,      // X register
+    pub y: u8,      // Y register
+    pub stkp: u8,   // stack pointer (points to location on bus)
+    pub pc: u16,    // program counter
+    pub status: u8, // status register
 
     cycles: u8,
     fetched: u8,
@@ -38,7 +38,7 @@ impl Cpu {
         }
     }
 
-    fn read(&self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         self.bus.read(addr)
     }
 
@@ -46,7 +46,7 @@ impl Cpu {
         self.bus.write(addr, data);
     }
 
-    fn get_flag(&self, f: Flag) -> bool {
+    pub fn get_flag(&self, f: Flag) -> bool {
         self.status & f.mask() != 0
     }
 
@@ -754,7 +754,8 @@ impl Cpu {
     }
 }
 
-enum Flag {
+#[derive(Copy, Clone)]
+pub enum Flag {
     C, // Carry bit
     Z, // Zero
     I, // Disable interrupts
@@ -776,6 +777,19 @@ impl Flag {
             Flag::U => 1 << 5,
             Flag::V => 1 << 6,
             Flag::N => 1 << 7,
+        }
+    }
+
+    pub fn ch(&self) -> &str {
+        match self {
+            Flag::C => "C",
+            Flag::Z => "Z",
+            Flag::I => "I",
+            Flag::D => "D",
+            Flag::B => "B",
+            Flag::U => "U",
+            Flag::V => "V",
+            Flag::N => "N",
         }
     }
 }

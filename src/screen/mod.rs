@@ -10,28 +10,29 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
-pub struct Screen {
-    params: ScreenParams,
+pub struct Screen<'a> {
+    params: ScreenParams<'a>,
     window: Window,
     input: WinitInputHelper,
     pixels: Pixels,
     event_loop: EventLoop<()>,
 }
 
-pub struct ScreenParams {
+pub struct ScreenParams<'a> {
     pub width: u32,
     pub height: u32,
+    pub title: &'a str,
     pub backend: Box<dyn ScreenBackend>,
 }
 
-impl Screen {
+impl<'a> Screen<'a> {
     pub fn new(params: ScreenParams) -> Result<Screen, Error> {
         let event_loop = EventLoop::new();
         let input = WinitInputHelper::new();
         let window = {
             let size = LogicalSize::new(params.width as f64, params.height as f64);
             WindowBuilder::new()
-                .with_title("Hello Pixels")
+                .with_title(params.title)
                 .with_inner_size(size)
                 .with_min_inner_size(size)
                 .build(&event_loop)
@@ -94,6 +95,11 @@ impl Screen {
                 // Resize the window
                 if let Some(size) = self.input.window_resized() {
                     self.pixels.resize_surface(size.width, size.height);
+                    self.params.backend.init(Frame {
+                        frame: self.pixels.get_frame(),
+                        width: self.params.width,
+                        height: self.params.height,
+                    });
                 }
 
                 // Update internal state and request a redraw
