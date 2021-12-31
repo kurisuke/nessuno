@@ -164,9 +164,9 @@ impl Cpu {
 
                 if ptr_lo == 0x00ff {
                     // page boundary hw bug
-                    self.addr_abs = (self.read(ptr & 0xff00) << 8) as u16 | self.read(ptr) as u16;
+                    self.addr_abs = ((self.read(ptr & 0xff00) as u16) << 8) | self.read(ptr) as u16;
                 } else {
-                    self.addr_abs = (self.read(ptr + 1) << 8) as u16 | self.read(ptr) as u16;
+                    self.addr_abs = ((self.read(ptr + 1) as u16) << 8) | self.read(ptr) as u16;
                 }
                 false
             }
