@@ -1,4 +1,5 @@
-enum AddrMode {
+#[derive(PartialEq, Eq)]
+pub enum AddrMode {
     Imp,
     Imm,
     Zp0,
@@ -13,7 +14,7 @@ enum AddrMode {
     Izy,
 }
 
-enum Op {
+pub enum Op {
     Adc,
     And,
     Asl,
@@ -73,11 +74,11 @@ enum Op {
     Xxx,
 }
 
-struct Instr<'a> {
-    name: &'a str,
-    op: Op,
-    addr_mode: AddrMode,
-    cycles: u8,
+pub struct Instr<'a> {
+    pub name: &'a str,
+    pub op: Op,
+    pub addr_mode: AddrMode,
+    pub cycles: u8,
 }
 
 impl Instr<'_> {
@@ -91,7 +92,7 @@ impl Instr<'_> {
     }
 }
 
-const INSTR_LOOKUP: [Instr; 256] = [
+pub const INSTR_LOOKUP: [Instr; 256] = [
     // opcodes 0x00..=0x0f
     Instr::new("BRK", Op::Brk, AddrMode::Imm, 7),
     Instr::new("ORA", Op::Ora, AddrMode::Izx, 6),
