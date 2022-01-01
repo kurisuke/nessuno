@@ -2,7 +2,7 @@ use nessuno::cpu::{Disassembly, Flag};
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
-use nessuno::system::SystemDebugCpu;
+use nessuno::system_debug_cpu::SystemDebugCpu;
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 

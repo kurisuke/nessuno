@@ -812,9 +812,12 @@ impl Cpu {
                     format!("${:02x}, Y {{ZPY}}", value)
                 }
                 AddrMode::Rel => {
-                    let value = self.read(bus, addr as u16);
+                    let mut value = self.read(bus, addr as u16) as u16;
+                    if value & 0x80 > 0 {
+                        value |= 0xff00;
+                    }
                     addr += 1;
-                    let value_abs = (Wrapping(addr as u16) + Wrapping(value as u16)).0;
+                    let value_abs = (Wrapping(addr as u16) + Wrapping(value)).0;
                     format!("${:02x} [${:04x}] {{REL}}", value, value_abs)
                 }
                 AddrMode::Abs => {
