@@ -1,8 +1,8 @@
-use nessuno::bus::dummy::DummyBus;
-use nessuno::cpu::{Cpu, Disassembly, Flag};
+use nessuno::cpu::{Disassembly, Flag};
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
+use nessuno::system::SystemDebugCpu;
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
@@ -16,7 +16,7 @@ const ON_COLOR: [u8; 4] = [0x00, 0xbf, 0x00, 0xff];
 const HL_COLOR: [u8; 4] = [0xbf, 0xbf, 0xff, 0xff];
 
 struct DebugCpu {
-    cpu: Cpu,
+    system: SystemDebugCpu,
     disasm: Disassembly,
     text_writer: TextWriter,
 
@@ -39,22 +39,22 @@ impl DebugCpu {
             let mem_line = format!(
                 "${:04x}: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
                 page + i * 16,
-                self.cpu.read(addr),
-                self.cpu.read(addr + 1),
-                self.cpu.read(addr + 2),
-                self.cpu.read(addr + 3),
-                self.cpu.read(addr + 4),
-                self.cpu.read(addr + 5),
-                self.cpu.read(addr + 6),
-                self.cpu.read(addr + 7),
-                self.cpu.read(addr + 8),
-                self.cpu.read(addr + 9),
-                self.cpu.read(addr + 10),
-                self.cpu.read(addr + 11),
-                self.cpu.read(addr + 12),
-                self.cpu.read(addr + 13),
-                self.cpu.read(addr + 14),
-                self.cpu.read(addr + 15),
+                self.system.read(addr),
+                self.system.read(addr + 1),
+                self.system.read(addr + 2),
+                self.system.read(addr + 3),
+                self.system.read(addr + 4),
+                self.system.read(addr + 5),
+                self.system.read(addr + 6),
+                self.system.read(addr + 7),
+                self.system.read(addr + 8),
+                self.system.read(addr + 9),
+                self.system.read(addr + 10),
+                self.system.read(addr + 11),
+                self.system.read(addr + 12),
+                self.system.read(addr + 13),
+                self.system.read(addr + 14),
+                self.system.read(addr + 15),
             );
             self.text_writer
                 .write(frame, pos_x, pos_y + i, &mem_line, &FG_COLOR, &BG_COLOR);
@@ -67,7 +67,7 @@ impl DebugCpu {
             frame,
             pos_x,
             pos_y + 1,
-            &format!("PC: ${:04x}", self.cpu.pc),
+            &format!("PC: ${:04x}", self.system.cpu.pc),
             &FG_COLOR,
             &BG_COLOR,
         );
@@ -75,7 +75,7 @@ impl DebugCpu {
             frame,
             pos_x,
             pos_y + 2,
-            &format!("A:  ${:02x}   [{:3}]", self.cpu.a, self.cpu.a),
+            &format!("A:  ${:02x}   [{:3}]", self.system.cpu.a, self.system.cpu.a),
             &FG_COLOR,
             &BG_COLOR,
         );
@@ -83,7 +83,7 @@ impl DebugCpu {
             frame,
             pos_x,
             pos_y + 3,
-            &format!("X:  ${:02x}   [{:3}]", self.cpu.x, self.cpu.x),
+            &format!("X:  ${:02x}   [{:3}]", self.system.cpu.x, self.system.cpu.x),
             &FG_COLOR,
             &BG_COLOR,
         );
@@ -91,7 +91,7 @@ impl DebugCpu {
             frame,
             pos_x,
             pos_y + 4,
-            &format!("Y:  ${:02x}   [{:3}]", self.cpu.y, self.cpu.y),
+            &format!("Y:  ${:02x}   [{:3}]", self.system.cpu.y, self.system.cpu.y),
             &FG_COLOR,
             &BG_COLOR,
         );
@@ -99,7 +99,7 @@ impl DebugCpu {
             frame,
             pos_x,
             pos_y + 5,
-            &format!("SP: ${:04x}", self.cpu.stkp as u16),
+            &format!("SP: ${:04x}", self.system.cpu.stkp as u16),
             &FG_COLOR,
             &BG_COLOR,
         );
@@ -121,7 +121,7 @@ impl DebugCpu {
         .into_iter()
         .enumerate()
         {
-            let color = if self.cpu.get_flag(f) {
+            let color = if self.system.cpu.get_flag(f) {
                 &ON_COLOR
             } else {
                 &OFF_COLOR
@@ -206,31 +206,28 @@ impl ScreenBackend for DebugCpu {
 
     fn draw(&self, frame: Frame) {
         self.print_mem(frame.frame, 0x0000, 1, 1);
-        let pc_page = self.cpu.pc & 0xf000;
+        let pc_page = self.system.cpu.pc & 0xf000;
         self.print_mem(frame.frame, pc_page as i32, 1, 19);
 
         self.print_reg(frame.frame, 57, 1);
-        self.print_disasm(frame.frame, self.cpu.pc, 57, 8, 13);
+        self.print_disasm(frame.frame, self.system.cpu.pc, 57, 8, 13);
     }
 
     fn update(&mut self) {
         if let Some(action) = &self.action {
             match action {
                 &UserAction::Reset => {
-                    self.cpu.reset();
+                    self.system.cpu_reset();
                 }
                 &UserAction::Irq => {
-                    self.cpu.irq();
+                    self.system.cpu_irq();
                 }
                 &UserAction::Nmi => {
-                    self.cpu.nmi();
+                    self.system.cpu_nmi();
                 }
-                &UserAction::Step => loop {
-                    self.cpu.clock();
-                    if self.cpu.complete() {
-                        break;
-                    }
-                },
+                &UserAction::Step => {
+                    self.system.cpu_step();
+                }
                 _ => {}
             }
             self.action = None;
@@ -255,17 +252,16 @@ impl ScreenBackend for DebugCpu {
 
 impl DebugCpu {
     fn new() -> DebugCpu {
-        let mut bus = DummyBus::new();
-        bus.load_from_str(
+        let mut system = SystemDebugCpu::new();
+        system.load_from_str(
             "A2 0A 8E 00 00 A2 03 8E 01 00 AC 00 00 A9 00 18 6D 01 00 88 D0 FA 8D 02 00 EA EA EA",
             0x8000,
         );
-        bus.set_reset_vector(0x8000);
-        let cpu = Cpu::new(Box::new(bus));
-        let disasm = cpu.disassemble(0x0000, 0xffff);
+        system.set_reset_vector(0x8000);
+        let disasm = system.cpu_disassemble(0x0000, 0xffff);
 
         DebugCpu {
-            cpu,
+            system,
             disasm,
             text_writer: TextWriter::new(
                 "res/cozette.bdf",
