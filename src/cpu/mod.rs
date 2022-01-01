@@ -2,6 +2,7 @@ mod instr;
 
 use crate::bus::Bus;
 use instr::{AddrMode, Instr, Op, INSTR_LOOKUP};
+use std::collections::BTreeMap;
 use std::num::Wrapping;
 
 pub struct Cpu {
@@ -58,6 +59,10 @@ impl Cpu {
             // clear flag
             self.status &= !f.mask();
         }
+    }
+
+    pub fn complete(&self) -> bool {
+        self.cycles == 0
     }
 
     pub fn clock(&mut self) {
@@ -392,7 +397,7 @@ impl Cpu {
             }
             &Op::Dey => {
                 // Decrement Y Register
-                self.x = (Wrapping(self.y) - Wrapping(1)).0;
+                self.y = (Wrapping(self.y) - Wrapping(1)).0;
                 self.set_flag(Flag::Z, self.y & 0x00ff == 0);
                 self.set_flag(Flag::N, self.y & 0x0080 != 0);
                 false
@@ -423,7 +428,7 @@ impl Cpu {
             }
             &Op::Iny => {
                 // Increment Y Register
-                self.x = (Wrapping(self.y) + Wrapping(1)).0;
+                self.y = (Wrapping(self.y) + Wrapping(1)).0;
                 self.set_flag(Flag::Z, self.y & 0x00ff == 0);
                 self.set_flag(Flag::N, self.y & 0x0080 != 0);
                 false
@@ -752,7 +757,102 @@ impl Cpu {
         }
         self.fetched
     }
+
+    pub fn disassemble(&self, addr_start: u16, addr_stop: u16) -> Disassembly {
+        let mut addr = addr_start as u32;
+        let mut disasm = BTreeMap::new();
+        while addr <= addr_stop as u32 {
+            let line_addr = addr as u16;
+            let mut s = format!("${:04x}: ", addr);
+
+            let opcode = self.read(addr as u16);
+            addr += 1;
+
+            let instr = &INSTR_LOOKUP[opcode as usize];
+
+            s.push_str(instr.name);
+            s.push(' ');
+
+            let s_addr = match instr.addr_mode {
+                AddrMode::Imp => String::from("{IMP}"),
+                AddrMode::Imm => {
+                    let value = self.read(addr as u16);
+                    addr += 1;
+                    format!("#${:02x} {{IMM}}", value)
+                }
+                AddrMode::Zp0 => {
+                    let value = self.read(addr as u16);
+                    addr += 1;
+                    format!("${:02x} {{ZP0}}", value)
+                }
+                AddrMode::Zpx => {
+                    let value = self.read(addr as u16);
+                    addr += 1;
+                    format!("${:02x}, X {{ZPX}}", value)
+                }
+                AddrMode::Zpy => {
+                    let value = self.read(addr as u16);
+                    addr += 1;
+                    format!("${:02x}, Y {{ZPY}}", value)
+                }
+                AddrMode::Rel => {
+                    let value = self.read(addr as u16);
+                    addr += 1;
+                    let value_abs = (Wrapping(addr as u16) + Wrapping(value as u16)).0;
+                    format!("${:02x} [${:04x}] {{REL}}", value, value_abs)
+                }
+                AddrMode::Abs => {
+                    let lo = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let hi = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let value = (hi << 8) | lo;
+                    format!("${:04x} {{ABS}}", value)
+                }
+                AddrMode::Abx => {
+                    let lo = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let hi = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let value = (hi << 8) | lo;
+                    format!("${:04x}, X {{ABX}}", value)
+                }
+                AddrMode::Aby => {
+                    let lo = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let hi = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let value = (hi << 8) | lo;
+                    format!("${:04x}, Y {{ABY}}", value)
+                }
+                AddrMode::Ind => {
+                    let lo = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let hi = self.read(addr as u16) as u16;
+                    addr += 1;
+                    let value = (hi << 8) | lo;
+                    format!("(${:04x}) {{IND}}", value)
+                }
+                AddrMode::Izx => {
+                    let value = self.read(addr as u16);
+                    addr += 1;
+                    format!("(${:02x}), X {{IZX}}", value)
+                }
+                AddrMode::Izy => {
+                    let value = self.read(addr as u16);
+                    addr += 1;
+                    format!("(${:02x}), Y {{IZY}}", value)
+                }
+            };
+            s.push_str(&s_addr);
+
+            disasm.insert(line_addr, s);
+        }
+        disasm
+    }
 }
+
+pub type Disassembly = BTreeMap<u16, String>;
 
 #[derive(Copy, Clone)]
 pub enum Flag {
