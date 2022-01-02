@@ -15,7 +15,7 @@ impl Mapper000 {
 }
 
 impl Mapper for Mapper000 {
-    fn cpu_map_read(&mut self, addr: u16) -> Option<usize> {
+    fn cpu_map_read(&self, addr: u16) -> Option<usize> {
         match addr {
             0x8000..=0xffff => {
                 if self.num_banks_prg > 1 {
@@ -41,7 +41,7 @@ impl Mapper for Mapper000 {
         }
     }
 
-    fn ppu_map_read(&mut self, addr: u16) -> Option<usize> {
+    fn ppu_map_read(&self, addr: u16) -> Option<usize> {
         match addr {
             0x0000..=0x1fff => Some(addr as usize),
             _ => None,

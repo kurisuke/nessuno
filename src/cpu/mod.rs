@@ -36,13 +36,7 @@ impl Cpu {
         }
     }
 
-    pub fn read<T: CpuBus>(&mut self, bus: &mut T, addr: u16) -> u8 {
-        bus.cpu_read(addr)
-    }
 
-    fn write<T: CpuBus>(&mut self, bus: &mut T, addr: u16, data: u8) {
-        bus.cpu_write(addr, data);
-    }
 
     pub fn get_flag(&self, f: Flag) -> bool {
         self.status & f.mask() != 0
@@ -64,7 +58,7 @@ impl Cpu {
 
     pub fn clock<T: CpuBus>(&mut self, bus: &mut T) {
         if self.cycles == 0 {
-            let opcode = self.read(bus, self.pc);
+            let opcode = bus.cpu_read(self.pc);
             self.pc += 1;
 
             let instr = &INSTR_LOOKUP[opcode as usize];
@@ -90,24 +84,24 @@ impl Cpu {
                 false
             }
             &AddrMode::Zp0 => {
-                self.addr_abs = self.read(bus, self.pc) as u16;
+                self.addr_abs = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 false
             }
             &AddrMode::Zpx => {
-                self.addr_abs = self.read(bus, self.pc) as u16 + self.x as u16;
+                self.addr_abs = bus.cpu_read(self.pc) as u16 + self.x as u16;
                 self.addr_abs &= 0x00ff;
                 self.pc += 1;
                 false
             }
             &AddrMode::Zpy => {
-                self.addr_abs = self.read(bus, self.pc) as u16 + self.y as u16;
+                self.addr_abs = bus.cpu_read(self.pc) as u16 + self.y as u16;
                 self.addr_abs &= 0x00ff;
                 self.pc += 1;
                 false
             }
             &AddrMode::Rel => {
-                self.addr_rel = self.read(bus, self.pc) as u16;
+                self.addr_rel = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 if self.addr_rel & 0x80 > 0 {
                     self.addr_rel |= 0xff00;
@@ -115,9 +109,9 @@ impl Cpu {
                 false
             }
             &AddrMode::Abs => {
-                let lo = self.read(bus, self.pc) as u16;
+                let lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
-                let hi = self.read(bus, self.pc) as u16;
+                let hi = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
                 self.addr_abs = (hi << 8) | lo;
@@ -125,9 +119,9 @@ impl Cpu {
                 false
             }
             &AddrMode::Abx => {
-                let lo = self.read(bus, self.pc) as u16;
+                let lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
-                let hi = self.read(bus, self.pc) as u16;
+                let hi = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
                 self.addr_abs = (hi << 8) | lo;
@@ -141,9 +135,9 @@ impl Cpu {
                 }
             }
             &AddrMode::Aby => {
-                let lo = self.read(bus, self.pc) as u16;
+                let lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
-                let hi = self.read(bus, self.pc) as u16;
+                let hi = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
                 self.addr_abs = (hi << 8) | lo;
@@ -157,9 +151,9 @@ impl Cpu {
                 }
             }
             &AddrMode::Ind => {
-                let ptr_lo = self.read(bus, self.pc) as u16;
+                let ptr_lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
-                let ptr_hi = self.read(bus, self.pc) as u16;
+                let ptr_hi = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
                 let ptr = (ptr_hi << 8) | ptr_lo;
@@ -167,30 +161,30 @@ impl Cpu {
                 if ptr_lo == 0x00ff {
                     // page boundary hw bug
                     self.addr_abs =
-                        ((self.read(bus, ptr & 0xff00) as u16) << 8) | self.read(bus, ptr) as u16;
+                        ((bus.cpu_read(ptr & 0xff00) as u16) << 8) | bus.cpu_read(ptr) as u16;
                 } else {
                     self.addr_abs =
-                        ((self.read(bus, ptr + 1) as u16) << 8) | self.read(bus, ptr) as u16;
+                        ((bus.cpu_read(ptr + 1) as u16) << 8) | bus.cpu_read(ptr) as u16;
                 }
                 false
             }
             &AddrMode::Izx => {
-                let t = self.read(bus, self.pc) as u16;
+                let t = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
-                let lo = self.read(bus, (t + self.x as u16) & 0x00ff) as u16;
-                let hi = self.read(bus, (t + self.x as u16 + 1) & 0x00ff) as u16;
+                let lo = bus.cpu_read((t + self.x as u16) & 0x00ff) as u16;
+                let hi = bus.cpu_read((t + self.x as u16 + 1) & 0x00ff) as u16;
 
                 self.addr_abs = (hi << 8) | lo;
 
                 false
             }
             &AddrMode::Izy => {
-                let t = self.read(bus, self.pc) as u16;
+                let t = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
-                let lo = self.read(bus, t & 0x00ff) as u16;
-                let hi = self.read(bus, (t + 1) & 0x00ff) as u16;
+                let lo = bus.cpu_read(t & 0x00ff) as u16;
+                let hi = bus.cpu_read((t + 1) & 0x00ff) as u16;
 
                 self.addr_abs = (hi << 8) | lo;
                 self.addr_abs += self.y as u16;
@@ -240,7 +234,7 @@ impl Cpu {
                 if instr.addr_mode == AddrMode::Imp {
                     self.a = (tmp & 0x00ff) as u8;
                 } else {
-                    self.write(bus, self.addr_abs, (tmp & 0x00ff) as u8);
+                    bus.cpu_write(self.addr_abs, (tmp & 0x00ff) as u8);
                 }
 
                 false
@@ -301,22 +295,21 @@ impl Cpu {
                 self.pc += 1;
 
                 self.set_flag(Flag::I, true);
-                self.write(
-                    bus,
+                bus.cpu_write(
                     0x0100 + self.stkp as u16,
                     ((self.pc >> 8) & 0x00ff) as u8,
                 );
                 self.stkp -= 1;
-                self.write(bus, 0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
+                bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
                 self.stkp -= 1;
 
                 self.set_flag(Flag::B, true);
-                self.write(bus, 0x0100 + self.stkp as u16, self.status);
+                bus.cpu_write(0x0100 + self.stkp as u16, self.status);
                 self.stkp -= 1;
                 self.set_flag(Flag::B, false);
 
-                let lo = self.read(bus, 0xfffe) as u16;
-                let hi = self.read(bus, 0xffff) as u16;
+                let lo = bus.cpu_read(0xfffe) as u16;
+                let hi = bus.cpu_read(0xffff) as u16;
                 self.pc = (hi << 8) | lo;
 
                 false
@@ -386,7 +379,7 @@ impl Cpu {
                 // Decrement Value at Memory Location
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (Wrapping(self.fetched) - Wrapping(1)).0;
-                self.write(bus, self.addr_abs, (tmp & 0x00ff) as u8);
+                bus.cpu_write(self.addr_abs, (tmp & 0x00ff) as u8);
                 self.set_flag(Flag::Z, tmp & 0x00ff == 0);
                 self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 false
@@ -417,7 +410,7 @@ impl Cpu {
                 // Increment Value at Memory Location
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (Wrapping(self.fetched) + Wrapping(1)).0;
-                self.write(bus, self.addr_abs, (tmp & 0x00ff) as u8);
+                bus.cpu_write(self.addr_abs, (tmp & 0x00ff) as u8);
                 self.set_flag(Flag::Z, tmp & 0x00ff == 0);
                 self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 false
@@ -445,13 +438,12 @@ impl Cpu {
                 // Jump To Sub-Routine
                 self.pc -= 1;
 
-                self.write(
-                    bus,
+                bus.cpu_write(
                     0x0100 + self.stkp as u16,
                     ((self.pc >> 8) & 0x00ff) as u8,
                 );
                 self.stkp -= 1;
-                self.write(bus, 0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
+                bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
                 self.stkp -= 1;
 
                 self.pc = self.addr_abs;
@@ -493,7 +485,7 @@ impl Cpu {
                 if instr.addr_mode == AddrMode::Imp {
                     self.a = tmp;
                 } else {
-                    self.write(bus, self.addr_abs, tmp);
+                    bus.cpu_write(self.addr_abs, tmp);
                 }
                 false
             }
@@ -515,14 +507,13 @@ impl Cpu {
             }
             &Op::Pha => {
                 // Push Accumulator to Stack
-                self.write(bus, 0x0100 + self.stkp as u16, self.a);
+                bus.cpu_write(0x0100 + self.stkp as u16, self.a);
                 self.stkp -= 1;
                 false
             }
             &Op::Php => {
                 // Push Status Register to Stack
-                self.write(
-                    bus,
+                bus.cpu_write(
                     0x0100 + self.stkp as u16,
                     self.status | Flag::B.mask() | Flag::U.mask(),
                 );
@@ -533,7 +524,7 @@ impl Cpu {
             &Op::Pla => {
                 // Pop Accumulator off Stack
                 self.stkp += 1;
-                self.a = self.read(bus, 0x0100 + self.stkp as u16);
+                self.a = bus.cpu_read(0x0100 + self.stkp as u16);
                 self.set_flag(Flag::Z, self.a == 0x00);
                 self.set_flag(Flag::N, self.a & 0x80 != 0);
                 false
@@ -541,7 +532,7 @@ impl Cpu {
             &Op::Plp => {
                 // Pop Status Register off Stack
                 self.stkp += 1;
-                self.status = self.read(bus, 0x0100 + self.stkp as u16);
+                self.status = bus.cpu_read(0x0100 + self.stkp as u16);
                 self.set_flag(Flag::U, true);
                 false
             }
@@ -555,7 +546,7 @@ impl Cpu {
                 if instr.addr_mode == AddrMode::Imp {
                     self.a = (tmp & 0x00ff) as u8;
                 } else {
-                    self.write(bus, self.addr_abs, (tmp & 0x00ff) as u8);
+                    bus.cpu_write(self.addr_abs, (tmp & 0x00ff) as u8);
                 }
                 false
             }
@@ -569,29 +560,29 @@ impl Cpu {
                 if instr.addr_mode == AddrMode::Imp {
                     self.a = (tmp & 0x00ff) as u8;
                 } else {
-                    self.write(bus, self.addr_abs, (tmp & 0x00ff) as u8);
+                    bus.cpu_write(self.addr_abs, (tmp & 0x00ff) as u8);
                 }
                 false
             }
             &Op::Rti => {
                 // Return from Interrupt
                 self.stkp += 1;
-                self.status = self.read(bus, 0x0100 + self.stkp as u16);
+                self.status = bus.cpu_read(0x0100 + self.stkp as u16);
                 self.status &= !Flag::B.mask();
                 self.status &= !Flag::U.mask();
 
                 self.stkp += 1;
-                self.pc = self.read(bus, 0x100 + self.stkp as u16) as u16;
+                self.pc = bus.cpu_read(0x100 + self.stkp as u16) as u16;
                 self.stkp += 1;
-                self.pc |= (self.read(bus, 0x100 + self.stkp as u16) as u16) << 8;
+                self.pc |= (bus.cpu_read(0x100 + self.stkp as u16) as u16) << 8;
                 false
             }
             &Op::Rts => {
                 // Return from Subroutine
                 self.stkp += 1;
-                self.pc = self.read(bus, 0x100 + self.stkp as u16) as u16;
+                self.pc = bus.cpu_read(0x100 + self.stkp as u16) as u16;
                 self.stkp += 1;
-                self.pc |= (self.read(bus, 0x100 + self.stkp as u16) as u16) << 8;
+                self.pc |= (bus.cpu_read(0x100 + self.stkp as u16) as u16) << 8;
                 false
             }
             &Op::Sbc => {
@@ -630,17 +621,17 @@ impl Cpu {
             }
             &Op::Sta => {
                 // Store Accumulator at Address
-                self.write(bus, self.addr_abs, self.a);
+                bus.cpu_write(self.addr_abs, self.a);
                 false
             }
             &Op::Stx => {
                 // Store X Register at Address
-                self.write(bus, self.addr_abs, self.x);
+                bus.cpu_write(self.addr_abs, self.x);
                 false
             }
             &Op::Sty => {
                 // Store Y Register at Address
-                self.write(bus, self.addr_abs, self.y);
+                bus.cpu_write(self.addr_abs, self.y);
                 false
             }
             &Op::Tax => {
@@ -706,8 +697,8 @@ impl Cpu {
         self.status = 0x00 | Flag::U.mask();
 
         self.addr_abs = 0xfffc;
-        let lo = self.read(bus, self.addr_abs) as u16;
-        let hi = self.read(bus, self.addr_abs + 1) as u16;
+        let lo = bus.cpu_read(self.addr_abs) as u16;
+        let hi = bus.cpu_read(self.addr_abs + 1) as u16;
         self.pc = (hi << 8) | lo;
 
         self.addr_rel = 0x0000;
@@ -719,24 +710,23 @@ impl Cpu {
 
     pub fn irq<T: CpuBus>(&mut self, bus: &mut T) {
         if !self.get_flag(Flag::I) {
-            self.write(
-                bus,
+            bus.cpu_write(
                 0x0100 + self.stkp as u16,
                 ((self.pc >> 8) & 0x00ff) as u8,
             );
             self.stkp -= 1;
-            self.write(bus, 0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
+            bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
             self.stkp -= 1;
 
             self.set_flag(Flag::B, false);
             self.set_flag(Flag::U, true);
             self.set_flag(Flag::I, true);
-            self.write(bus, 0x0100 + self.stkp as u16, self.status);
+            bus.cpu_write(0x0100 + self.stkp as u16, self.status);
             self.stkp -= 1;
 
             self.addr_abs = 0xfffe;
-            let lo = self.read(bus, self.addr_abs) as u16;
-            let hi = self.read(bus, self.addr_abs + 1) as u16;
+            let lo = bus.cpu_read(self.addr_abs) as u16;
+            let hi = bus.cpu_read(self.addr_abs + 1) as u16;
             self.pc = (hi << 8) | lo;
 
             self.cycles = 7;
@@ -744,24 +734,23 @@ impl Cpu {
     }
 
     pub fn nmi<T: CpuBus>(&mut self, bus: &mut T) {
-        self.write(
-            bus,
+        bus.cpu_write(
             0x0100 + self.stkp as u16,
             ((self.pc >> 8) & 0x00ff) as u8,
         );
         self.stkp -= 1;
-        self.write(bus, 0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
+        bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
         self.stkp -= 1;
 
         self.set_flag(Flag::B, false);
         self.set_flag(Flag::U, true);
         self.set_flag(Flag::I, true);
-        self.write(bus, 0x0100 + self.stkp as u16, self.status);
+        bus.cpu_write(0x0100 + self.stkp as u16, self.status);
         self.stkp -= 1;
 
         self.addr_abs = 0xfffa;
-        let lo = self.read(bus, self.addr_abs) as u16;
-        let hi = self.read(bus, self.addr_abs + 1) as u16;
+        let lo = bus.cpu_read(self.addr_abs) as u16;
+        let hi = bus.cpu_read(self.addr_abs + 1) as u16;
         self.pc = (hi << 8) | lo;
 
         self.cycles = 8;
@@ -769,14 +758,14 @@ impl Cpu {
 
     fn fetch<T: CpuBus>(&mut self, bus: &mut T, addr_mode: &AddrMode) -> u8 {
         if addr_mode != &AddrMode::Imp {
-            self.fetched = self.read(bus, self.addr_abs);
+            self.fetched = bus.cpu_read(self.addr_abs);
         }
         self.fetched
     }
 
     pub fn disassemble<T: CpuBus>(
         &mut self,
-        bus: &mut T,
+        bus: &T,
         addr_start: u16,
         addr_stop: u16,
     ) -> Disassembly {
@@ -786,7 +775,7 @@ impl Cpu {
             let line_addr = addr as u16;
             let mut s = format!("${:04x}: ", addr);
 
-            let opcode = self.read(bus, addr as u16);
+            let opcode = bus.cpu_read_ro(addr as u16);
             addr += 1;
 
             let instr = &INSTR_LOOKUP[opcode as usize];
@@ -797,27 +786,27 @@ impl Cpu {
             let s_addr = match instr.addr_mode {
                 AddrMode::Imp => String::from("{IMP}"),
                 AddrMode::Imm => {
-                    let value = self.read(bus, addr as u16);
+                    let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
                     format!("#${:02x} {{IMM}}", value)
                 }
                 AddrMode::Zp0 => {
-                    let value = self.read(bus, addr as u16);
+                    let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
                     format!("${:02x} {{ZP0}}", value)
                 }
                 AddrMode::Zpx => {
-                    let value = self.read(bus, addr as u16);
+                    let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
                     format!("${:02x}, X {{ZPX}}", value)
                 }
                 AddrMode::Zpy => {
-                    let value = self.read(bus, addr as u16);
+                    let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
                     format!("${:02x}, Y {{ZPY}}", value)
                 }
                 AddrMode::Rel => {
-                    let mut value = self.read(bus, addr as u16) as u16;
+                    let mut value = bus.cpu_read_ro(addr as u16) as u16;
                     if value & 0x80 > 0 {
                         value |= 0xff00;
                     }
@@ -826,44 +815,44 @@ impl Cpu {
                     format!("${:02x} [${:04x}] {{REL}}", value, value_abs)
                 }
                 AddrMode::Abs => {
-                    let lo = self.read(bus, addr as u16) as u16;
+                    let lo = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
-                    let hi = self.read(bus, addr as u16) as u16;
+                    let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
                     format!("${:04x} {{ABS}}", value)
                 }
                 AddrMode::Abx => {
-                    let lo = self.read(bus, addr as u16) as u16;
+                    let lo = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
-                    let hi = self.read(bus, addr as u16) as u16;
+                    let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
                     format!("${:04x}, X {{ABX}}", value)
                 }
                 AddrMode::Aby => {
-                    let lo = self.read(bus, addr as u16) as u16;
+                    let lo = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
-                    let hi = self.read(bus, addr as u16) as u16;
+                    let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
                     format!("${:04x}, Y {{ABY}}", value)
                 }
                 AddrMode::Ind => {
-                    let lo = self.read(bus, addr as u16) as u16;
+                    let lo = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
-                    let hi = self.read(bus, addr as u16) as u16;
+                    let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
                     format!("(${:04x}) {{IND}}", value)
                 }
                 AddrMode::Izx => {
-                    let value = self.read(bus, addr as u16);
+                    let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
                     format!("(${:02x}), X {{IZX}}", value)
                 }
                 AddrMode::Izy => {
-                    let value = self.read(bus, addr as u16);
+                    let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
                     format!("(${:02x}), Y {{IZY}}", value)
                 }

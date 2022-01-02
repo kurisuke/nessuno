@@ -86,8 +86,8 @@ impl System {
         self.cpu.disassemble(&mut self.bus, addr_start, addr_stop)
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
-        self.bus.cpu_read(addr)
+    pub fn read(&self, addr: u16) -> u8 {
+        self.bus.cpu_read_ro(addr)
     }
 
     pub fn ppu_get_pattern_table(&mut self, table_idx: usize, palette: usize) -> PatternTable {
@@ -127,6 +127,19 @@ impl CpuBus for Bus {
                 // CPU Ram
                 0x0000..=0x1fff => self.ram_cpu[(addr & 0x07ff) as usize],
                 0x2000..=0x3fff => self.ppu.cpu_read(addr & 0x0007),
+                _ => 0,
+            }
+        }
+    }
+
+    fn cpu_read_ro(&self, addr: u16) -> u8 {
+        if let Some(data) = self.cart.cpu_read_ro(addr) {
+            data
+        } else {
+            match addr {
+                // CPU Ram
+                0x0000..=0x1fff => self.ram_cpu[(addr & 0x07ff) as usize],
+                0x2000..=0x3fff => self.ppu.cpu_read_ro(addr & 0x0007),
                 _ => 0,
             }
         }

@@ -76,4 +76,8 @@ impl CpuBus for MemoryDebugCpu {
     fn cpu_read(&mut self, addr: u16) -> u8 {
         self.ram[addr as usize]
     }
+
+    fn cpu_read_ro(&self, addr: u16) -> u8 {
+        self.ram[addr as usize]
+    }
 }

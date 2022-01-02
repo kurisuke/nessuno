@@ -101,6 +101,12 @@ impl Cartridge {
             .map(|mapped_addr| self.mem_prg[mapped_addr])
     }
 
+    pub fn cpu_read_ro(&self, addr: u16) -> Option<u8> {
+        self.mapper
+            .cpu_map_read(addr)
+            .map(|mapped_addr| self.mem_prg[mapped_addr])
+    }
+
     pub fn cpu_write(&mut self, addr: u16, data: u8) -> bool {
         if let Some(mapped_addr) = self.mapper.cpu_map_write(addr) {
             self.mem_prg[mapped_addr] = data;
