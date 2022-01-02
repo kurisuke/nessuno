@@ -1,7 +1,7 @@
 use crate::bus::CpuBus;
 use crate::cartridge::Cartridge;
 use crate::cpu::{Cpu, Disassembly};
-use crate::ppu::Ppu;
+use crate::ppu::{Ppu, PpuRenderParams};
 
 pub struct System {
     pub cpu: Cpu,
@@ -17,24 +17,55 @@ struct Bus {
 }
 
 impl System {
-    pub fn new(cart: Cartridge) -> System {
+    pub fn new(cart: Cartridge, render_params: PpuRenderParams) -> System {
         System {
             cpu: Cpu::new(),
             bus: Bus {
                 ram_cpu: [0; 2 * 1024],
-                ppu: Ppu::new(),
+                ppu: Ppu::new(render_params),
                 cart,
             },
             clock_counter: 0,
         }
     }
 
-    pub fn step(&mut self) {
-        loop {
+    pub fn clock(&mut self, frame: &mut [u8]) {
+        self.bus.ppu.clock(frame);
+        if self.clock_counter % 3 == 0 {
             self.cpu.clock(&mut self.bus);
+        }
+        self.clock_counter += 1;
+    }
+
+    pub fn frame(&mut self, frame: &mut [u8], wait_cpu_complete: bool) {
+        loop {
+            self.clock(frame);
+            if self.bus.ppu.frame_complete {
+                break;
+            }
+
+            if wait_cpu_complete {
+                while !self.cpu.complete() {
+                    self.clock(frame);
+                }
+            }
+
+            self.bus.ppu.frame_complete = false;
+        }
+    }
+
+    pub fn step(&mut self, frame: &mut [u8]) {
+        // Run cycles until the current CPU instruction has executed
+        loop {
+            self.clock(frame);
             if self.cpu.complete() {
                 break;
             }
+        }
+
+        // Run additional system clock cycles (e.g. PPU) until the next CPU instruction starts
+        while self.cpu.complete() {
+            self.clock(frame);
         }
     }
 
