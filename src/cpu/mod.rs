@@ -36,7 +36,7 @@ impl Cpu {
         }
     }
 
-    pub fn read<T: CpuBus>(&self, bus: &T, addr: u16) -> u8 {
+    pub fn read<T: CpuBus>(&mut self, bus: &mut T, addr: u16) -> u8 {
         bus.cpu_read(addr)
     }
 
@@ -78,7 +78,7 @@ impl Cpu {
         self.cycles -= 1;
     }
 
-    fn addr_mode<T: CpuBus>(&mut self, bus: &T, addr_mode: &AddrMode) -> bool {
+    fn addr_mode<T: CpuBus>(&mut self, bus: &mut T, addr_mode: &AddrMode) -> bool {
         match addr_mode {
             &AddrMode::Imp => {
                 self.fetched = self.a;
@@ -698,7 +698,7 @@ impl Cpu {
         self.pc = self.addr_abs;
     }
 
-    pub fn reset<T: CpuBus>(&mut self, bus: &T) {
+    pub fn reset<T: CpuBus>(&mut self, bus: &mut T) {
         self.a = 0x00;
         self.x = 0x00;
         self.y = 0x00;
@@ -767,14 +767,19 @@ impl Cpu {
         self.cycles = 8;
     }
 
-    fn fetch<T: CpuBus>(&mut self, bus: &T, addr_mode: &AddrMode) -> u8 {
+    fn fetch<T: CpuBus>(&mut self, bus: &mut T, addr_mode: &AddrMode) -> u8 {
         if addr_mode != &AddrMode::Imp {
             self.fetched = self.read(bus, self.addr_abs);
         }
         self.fetched
     }
 
-    pub fn disassemble<T: CpuBus>(&self, bus: &T, addr_start: u16, addr_stop: u16) -> Disassembly {
+    pub fn disassemble<T: CpuBus>(
+        &mut self,
+        bus: &mut T,
+        addr_start: u16,
+        addr_stop: u16,
+    ) -> Disassembly {
         let mut addr = addr_start as u32;
         let mut disasm = BTreeMap::new();
         while addr <= addr_stop as u32 {

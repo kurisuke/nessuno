@@ -35,7 +35,7 @@ impl SystemDebugCpu {
     }
 
     pub fn cpu_reset(&mut self) {
-        self.cpu.reset(&self.memory);
+        self.cpu.reset(&mut self.memory);
     }
 
     pub fn cpu_irq(&mut self) {
@@ -46,8 +46,9 @@ impl SystemDebugCpu {
         self.cpu.nmi(&mut self.memory);
     }
 
-    pub fn cpu_disassemble(&self, addr_start: u16, addr_stop: u16) -> Disassembly {
-        self.cpu.disassemble(&self.memory, addr_start, addr_stop)
+    pub fn cpu_disassemble(&mut self, addr_start: u16, addr_stop: u16) -> Disassembly {
+        self.cpu
+            .disassemble(&mut self.memory, addr_start, addr_stop)
     }
 
     pub fn read(&self, addr: u16) -> u8 {
@@ -72,7 +73,7 @@ impl CpuBus for MemoryDebugCpu {
         self.ram[addr as usize] = data;
     }
 
-    fn cpu_read(&self, addr: u16) -> u8 {
+    fn cpu_read(&mut self, addr: u16) -> u8 {
         self.ram[addr as usize]
     }
 }
