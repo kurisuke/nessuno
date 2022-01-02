@@ -103,7 +103,11 @@ impl<'a> Screen<'a> {
                 }
 
                 // Update internal state and request a redraw
-                self.params.backend.update();
+                self.params.backend.update(Frame {
+                    frame: self.pixels.get_frame(),
+                    width: self.params.width,
+                    height: self.params.height,
+                });
                 self.window.request_redraw();
             }
         });

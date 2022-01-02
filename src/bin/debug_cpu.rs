@@ -213,7 +213,7 @@ impl ScreenBackend for DebugCpu {
         self.print_disasm(frame.frame, self.system.cpu.pc, 57, 8, 13);
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, _frame: Frame) {
         if let Some(action) = &self.action {
             match action {
                 &UserAction::Reset => {
