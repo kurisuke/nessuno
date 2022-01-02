@@ -1,8 +1,12 @@
+use nessuno::cartridge::Cartridge;
 use nessuno::cpu::{Disassembly, Flag};
+use nessuno::ppu::PpuRenderParams;
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
-use nessuno::system_debug_cpu::SystemDebugCpu;
+use nessuno::system::System;
+use std::env;
+use std::io;
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
@@ -15,52 +19,26 @@ const OFF_COLOR: [u8; 4] = [0xbf, 0x00, 0x00, 0xff];
 const ON_COLOR: [u8; 4] = [0x00, 0xbf, 0x00, 0xff];
 const HL_COLOR: [u8; 4] = [0xbf, 0xbf, 0xff, 0xff];
 
-struct DebugCpu {
-    system: SystemDebugCpu,
+const FRAME_DURATION: f64 = 1f64 / 60f64;
+
+struct Nessuno {
+    system: System,
     disasm: Disassembly,
     text_writer: TextWriter,
 
+    run: bool,
+    t_residual: f64,
     action: Option<UserAction>,
     paint: bool,
 }
 
 enum UserAction {
-    Init,
-    Step,
     Reset,
-    Irq,
-    Nmi,
+    Step,
+    Frame,
 }
 
-impl DebugCpu {
-    fn print_mem(&self, frame: &mut [u8], page: i32, pos_x: i32, pos_y: i32) {
-        for i in 0..16 {
-            let addr = (page + i * 16) as u16;
-            let mem_line = format!(
-                "${:04x}: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-                page + i * 16,
-                self.system.read(addr),
-                self.system.read(addr + 1),
-                self.system.read(addr + 2),
-                self.system.read(addr + 3),
-                self.system.read(addr + 4),
-                self.system.read(addr + 5),
-                self.system.read(addr + 6),
-                self.system.read(addr + 7),
-                self.system.read(addr + 8),
-                self.system.read(addr + 9),
-                self.system.read(addr + 10),
-                self.system.read(addr + 11),
-                self.system.read(addr + 12),
-                self.system.read(addr + 13),
-                self.system.read(addr + 14),
-                self.system.read(addr + 15),
-            );
-            self.text_writer
-                .write(frame, pos_x, pos_y + i, &mem_line, &FG_COLOR, &BG_COLOR);
-        }
-    }
-
+impl Nessuno {
     fn print_reg(&self, frame: &mut [u8], pos_x: i32, pos_y: i32) {
         self.print_status(frame, pos_x, pos_y);
         self.text_writer.write(
@@ -189,78 +167,87 @@ impl DebugCpu {
     }
 }
 
-impl ScreenBackend for DebugCpu {
+impl ScreenBackend for Nessuno {
     fn init(&self, frame: Frame) {
         for pixel in frame.frame.chunks_exact_mut(4) {
             pixel.copy_from_slice(&[0x00, 0x00, 0x7f, 0xff]);
         }
         self.text_writer.write(
             frame.frame,
-            1,
+            5,
             37,
-            "SPACE = step      R = reset      I = irq      N = nmi      ESC = quit",
+            "SPACE = run/pause      S = step      R = reset      F = frame      ESC = quit",
             &FG_COLOR,
             &BG_COLOR,
         );
     }
 
     fn draw(&self, frame: Frame) {
-        self.print_mem(frame.frame, 0x0000, 1, 1);
-        let pc_page = self.system.cpu.pc & 0xf000;
-        self.print_mem(frame.frame, pc_page as i32, 1, 19);
-
-        self.print_reg(frame.frame, 57, 1);
-        self.print_disasm(frame.frame, self.system.cpu.pc, 57, 8, 13);
+        self.print_reg(frame.frame, 82, 1);
+        self.print_disasm(frame.frame, self.system.cpu.pc, 82, 8, 13);
     }
 
-    fn update(&mut self, _frame: Frame, _dt: f64) {
-        if let Some(action) = &self.action {
-            match action {
-                &UserAction::Reset => {
-                    self.system.cpu_reset();
-                }
-                &UserAction::Irq => {
-                    self.system.cpu_irq();
-                }
-                &UserAction::Nmi => {
-                    self.system.cpu_nmi();
-                }
-                &UserAction::Step => {
-                    self.system.cpu_step();
-                }
-                _ => {}
+    fn update(&mut self, frame: Frame, dt: f64) {
+        if self.run {
+            if self.t_residual > 0f64 {
+                self.t_residual -= dt;
+            } else {
+                self.t_residual += FRAME_DURATION - dt;
+                self.system.frame(frame.frame, false);
+                self.paint = true;
             }
-            self.action = None;
-            self.paint = true;
         } else {
-            self.paint = false;
+            if let Some(action) = &self.action {
+                match *action {
+                    UserAction::Reset => {
+                        self.system.reset();
+                    }
+                    UserAction::Step => {
+                        self.system.step(frame.frame);
+                    }
+                    UserAction::Frame => {
+                        self.system.frame(frame.frame, true);
+                    }
+                }
+                self.action = None;
+                self.paint = true;
+            } else {
+                self.paint = false;
+            }
         }
     }
 
     fn handle_input(&mut self, input: &WinitInputHelper) {
-        if input.key_pressed(VirtualKeyCode::R) {
+        if input.key_pressed(VirtualKeyCode::Space) {
+            self.run = !self.run;
+            if !self.run {
+                self.t_residual = 0f64;
+            }
+        } else if input.key_pressed(VirtualKeyCode::R) {
             self.action = Some(UserAction::Reset);
-        } else if input.key_pressed(VirtualKeyCode::I) {
-            self.action = Some(UserAction::Irq);
-        } else if input.key_pressed(VirtualKeyCode::N) {
-            self.action = Some(UserAction::Nmi);
-        } else if input.key_pressed(VirtualKeyCode::Space) {
+        } else if input.key_pressed(VirtualKeyCode::F) {
+            self.action = Some(UserAction::Frame);
+        } else if input.key_pressed(VirtualKeyCode::S) {
             self.action = Some(UserAction::Step);
         }
     }
 }
 
-impl DebugCpu {
-    fn new() -> DebugCpu {
-        let mut system = SystemDebugCpu::new();
-        system.load_from_str(
-            "A2 0A 8E 00 00 A2 03 8E 01 00 AC 00 00 A9 00 18 6D 01 00 88 D0 FA 8D 02 00 EA EA EA",
-            0x8000,
+impl Nessuno {
+    fn new(cart: Cartridge) -> Nessuno {
+        let mut system = System::new(
+            cart,
+            PpuRenderParams {
+                offset_x: 30,
+                offset_y: 30,
+                width_y: SCREEN_WIDTH as usize,
+                scaling_factor: 2,
+                bytes_per_pixel: 4,
+            },
         );
-        system.set_reset_vector(0x8000);
         let disasm = system.cpu_disassemble(0x0000, 0xffff);
 
-        DebugCpu {
+        Nessuno {
             system,
             disasm,
             text_writer: TextWriter::new(
@@ -270,20 +257,27 @@ impl DebugCpu {
                     height: SCREEN_HEIGHT as usize,
                 },
             ),
-            action: Some(UserAction::Init),
+            run: false,
+            t_residual: 0f64,
+            action: Some(UserAction::Reset),
             paint: false,
         }
     }
 }
 
-fn main() {
+fn main() -> Result<(), io::Error> {
+    let args: Vec<_> = env::args().collect();
+    let cart = Cartridge::new(&args[1])?;
+
     let screen = Screen::new(ScreenParams {
         width: SCREEN_WIDTH,
         height: SCREEN_HEIGHT,
-        title: "debug_cpu",
-        backend: Box::new(DebugCpu::new()),
+        title: "nessuno",
+        backend: Box::new(Nessuno::new(cart)),
     })
     .unwrap();
 
     screen.run();
+
+    Ok(())
 }

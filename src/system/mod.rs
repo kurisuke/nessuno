@@ -43,15 +43,15 @@ impl System {
             if self.bus.ppu.frame_complete {
                 break;
             }
-
-            if wait_cpu_complete {
-                while !self.cpu.complete() {
-                    self.clock(frame);
-                }
-            }
-
-            self.bus.ppu.frame_complete = false;
         }
+
+        if wait_cpu_complete {
+            while !self.cpu.complete() {
+                self.clock(frame);
+            }
+        }
+
+        self.bus.ppu.frame_complete = false;
     }
 
     pub fn step(&mut self, frame: &mut [u8]) {

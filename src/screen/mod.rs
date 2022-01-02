@@ -4,6 +4,8 @@ pub mod textwriter;
 use backend::{Frame, ScreenBackend};
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
+use std::iter::Inspect;
+use std::time::Instant;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -16,6 +18,7 @@ pub struct Screen<'a> {
     input: WinitInputHelper,
     pixels: Pixels,
     event_loop: EventLoop<()>,
+    time: Instant,
 }
 
 pub struct ScreenParams<'a> {
@@ -58,10 +61,12 @@ impl<'a> Screen<'a> {
             input,
             pixels,
             event_loop,
+            time: Instant::now(),
         })
     }
 
     pub fn run(mut self) {
+        self.time = Instant::now();
         self.event_loop.run(move |event, _, control_flow| {
             // Draw the current frame
             if let Event::RedrawRequested(_) = event {
@@ -103,11 +108,18 @@ impl<'a> Screen<'a> {
                 }
 
                 // Update internal state and request a redraw
-                self.params.backend.update(Frame {
-                    frame: self.pixels.get_frame(),
-                    width: self.params.width,
-                    height: self.params.height,
-                });
+                let now = Instant::now();
+                let dt = now.duration_since(self.time).as_secs_f64();
+                self.time = now;
+
+                self.params.backend.update(
+                    Frame {
+                        frame: self.pixels.get_frame(),
+                        width: self.params.width,
+                        height: self.params.height,
+                    },
+                    dt,
+                );
                 self.window.request_redraw();
             }
         });

@@ -796,6 +796,7 @@ dependencies = [
  "env_logger",
  "log",
  "pixels",
+ "tiny-rng",
  "winit",
  "winit_input_helper",
 ]
@@ -1213,6 +1214,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "tiny-rng"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d63628286617a0c67ee3c4ef92ccf62044e3813ed7376bb82a4586d2ff7974dd"
 
 [[package]]
 name = "toml"

@@ -2,6 +2,7 @@ mod palette;
 
 use palette::PALETTE_2C02;
 use std::num::Wrapping;
+use tiny_rng::{Rand, Rng};
 
 pub struct Ppu {
     render_params: PpuRenderParams,
@@ -14,7 +15,7 @@ pub struct Ppu {
     scanline: usize,
     cycle: usize,
 
-    prng: Prng,
+    rng: Rng,
 }
 
 pub struct PpuRenderParams {
@@ -38,17 +39,13 @@ impl Ppu {
             cycle: 0,
             scanline: 0,
 
-            prng: Prng::new(),
+            rng: Rng::from_seed(123456789),
         }
     }
 
     pub fn clock(&mut self, frame: &mut [u8]) {
         if let Some(pos) = visible(self.scanline, self.cycle) {
-            let color = if self.prng.next().unwrap() & 0x1 > 0 {
-                0x3f
-            } else {
-                0x30
-            };
+            let color = self.rng.rand_usize() & 0x3f;
             self.set_pixel(frame, pos, color);
         }
 
@@ -56,7 +53,7 @@ impl Ppu {
         if self.cycle > 340 {
             self.cycle = 0;
             self.scanline += 1;
-            if self.scanline == 261 {
+            if self.scanline == 261 && self.cycle == 0 {
                 self.frame_complete = true;
             } else if self.scanline > 261 {
                 self.scanline = 0;
@@ -101,9 +98,9 @@ impl Ppu {
                     (py * self.render_params.width_y + px) * self.render_params.bytes_per_pixel;
                 let off1 =
                     (py * self.render_params.width_y + px + 1) * self.render_params.bytes_per_pixel;
-                let off2 =
-                    (py + 1 * self.render_params.width_y + px) * self.render_params.bytes_per_pixel;
-                let off3 = (py + 1 * self.render_params.width_y + px + 1)
+                let off2 = ((py + 1) * self.render_params.width_y + px)
+                    * self.render_params.bytes_per_pixel;
+                let off3 = ((py + 1) * self.render_params.width_y + px + 1)
                     * self.render_params.bytes_per_pixel;
 
                 let color = &PALETTE_2C02[color_idx];
@@ -122,24 +119,5 @@ fn visible(scanline: usize, cycle: usize) -> Option<(usize, usize)> {
         Some((scanline, cycle - 1))
     } else {
         None
-    }
-}
-
-struct Prng {
-    seed: u32,
-}
-
-impl Prng {
-    fn new() -> Self {
-        Self { seed: 0 }
-    }
-}
-
-impl Iterator for Prng {
-    type Item = u32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.seed = (Wrapping(1103515245) * Wrapping(self.seed) + Wrapping(12345)).0 % 2147483648;
-        Some(self.seed)
     }
 }

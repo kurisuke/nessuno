@@ -19,9 +19,9 @@ impl Mapper for Mapper000 {
         match addr {
             0x8000..=0xffff => {
                 if self.num_banks_prg > 1 {
-                    Some((addr & 0x7ff) as usize)
+                    Some((addr & 0x7fff) as usize)
                 } else {
-                    Some((addr & 0x3ff) as usize)
+                    Some((addr & 0x3fff) as usize)
                 }
             }
             _ => None,
@@ -32,9 +32,9 @@ impl Mapper for Mapper000 {
         match addr {
             0x8000..=0xffff => {
                 if self.num_banks_prg > 1 {
-                    Some((addr & 0x7ff) as usize)
+                    Some((addr & 0x7fff) as usize)
                 } else {
-                    Some((addr & 0x3ff) as usize)
+                    Some((addr & 0x3fff) as usize)
                 }
             }
             _ => None,

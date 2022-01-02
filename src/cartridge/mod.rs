@@ -16,7 +16,7 @@ pub struct Cartridge {
 }
 
 struct CartridgeHeader {
-    name: [char; 4],
+    name: [u8; 4],
     prg_rom_chunks: u8,
     chr_rom_chunks: u8,
     mapper1: u8,
@@ -33,12 +33,7 @@ impl CartridgeHeader {
         reader.read_exact(&mut buf)?;
 
         let header = CartridgeHeader {
-            name: [
-                buf[0] as char,
-                buf[1] as char,
-                buf[2] as char,
-                buf[3] as char,
-            ],
+            name: [buf[0], buf[1], buf[2], buf[3]],
             prg_rom_chunks: buf[4],
             chr_rom_chunks: buf[5],
             mapper1: buf[6],
@@ -54,7 +49,7 @@ impl CartridgeHeader {
 }
 
 impl Cartridge {
-    fn new(filename: &str) -> Result<Cartridge, io::Error> {
+    pub fn new(filename: &str) -> Result<Cartridge, io::Error> {
         let f = File::open(filename)?;
         let mut reader = io::BufReader::new(f);
         let header = CartridgeHeader::load(&mut reader)?;
