@@ -225,6 +225,136 @@ impl Ppu {
     }
 }
 
+/// PPU Registers
+
+struct StatusReg {
+    pub reg: u8,
+}
+
+enum StatusRegFlag {
+    SpriteOverflow,
+    SpriteZeroHit,
+    VerticalBlank,
+}
+
+impl StatusReg {
+    pub fn get_flag(&self, f: StatusRegFlag) -> bool {
+        self.reg & f.mask() != 0
+    }
+
+    fn set_flag(&mut self, f: StatusRegFlag, v: bool) {
+        if v {
+            // set flag
+            self.reg |= f.mask();
+        } else {
+            // clear flag
+            self.reg &= !f.mask();
+        }
+    }
+}
+
+impl StatusRegFlag {
+    fn mask(&self) -> u8 {
+        match self {
+            StatusRegFlag::SpriteOverflow => 1 << 5,
+            StatusRegFlag::SpriteZeroHit => 1 << 6,
+            StatusRegFlag::VerticalBlank => 1 << 7,
+        }
+    }
+}
+
+struct MaskReg {
+    pub reg: u8,
+}
+
+enum MaskRegFlag {
+    Grayscale,
+    RenderBgLeft,
+    RenderSpritesLeft,
+    RenderBg,
+    RenderSprites,
+    EnhanceRed,
+    EnhanceGreen,
+    EnhanceBlue,
+}
+
+impl MaskReg {
+    pub fn get_flag(&self, f: MaskRegFlag) -> bool {
+        self.reg & f.mask() != 0
+    }
+
+    fn set_flag(&mut self, f: MaskRegFlag, v: bool) {
+        if v {
+            // set flag
+            self.reg |= f.mask();
+        } else {
+            // clear flag
+            self.reg &= !f.mask();
+        }
+    }
+}
+
+impl MaskRegFlag {
+    fn mask(&self) -> u8 {
+        match self {
+            MaskRegFlag::Grayscale => 1 << 0,
+            MaskRegFlag::RenderBgLeft => 1 << 1,
+            MaskRegFlag::RenderSpritesLeft => 1 << 2,
+            MaskRegFlag::RenderBg => 1 << 3,
+            MaskRegFlag::RenderSprites => 1 << 4,
+            MaskRegFlag::EnhanceRed => 1 << 5,
+            MaskRegFlag::EnhanceGreen => 1 << 6,
+            MaskRegFlag::EnhanceBlue => 1 << 7,
+        }
+    }
+}
+
+struct ControlReg {
+    pub reg: u8,
+}
+
+enum ControlRegFlag {
+    NametableX,
+    NametableY,
+    IncrementMode,
+    PatternSprite,
+    PatternBg,
+    SpriteSize,
+    SlaveMode,
+    EnableNmi,
+}
+
+impl ControlReg {
+    pub fn get_flag(&self, f: ControlRegFlag) -> bool {
+        self.reg & f.mask() != 0
+    }
+
+    fn set_flag(&mut self, f: ControlRegFlag, v: bool) {
+        if v {
+            // set flag
+            self.reg |= f.mask();
+        } else {
+            // clear flag
+            self.reg &= !f.mask();
+        }
+    }
+}
+
+impl ControlRegFlag {
+    fn mask(&self) -> u8 {
+        match self {
+            ControlRegFlag::NametableX => 1 << 0,
+            ControlRegFlag::NametableY => 1 << 1,
+            ControlRegFlag::IncrementMode => 1 << 2,
+            ControlRegFlag::PatternSprite => 1 << 3,
+            ControlRegFlag::PatternBg => 1 << 4,
+            ControlRegFlag::SpriteSize => 1 << 5,
+            ControlRegFlag::SlaveMode => 1 << 6,
+            ControlRegFlag::EnableNmi => 1 << 7,
+        }
+    }
+}
+
 fn visible(scanline: usize, cycle: usize) -> Option<(usize, usize)> {
     if scanline < 240 && cycle >= 1 && cycle <= 256 {
         Some((scanline, cycle - 1))

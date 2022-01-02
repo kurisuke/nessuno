@@ -36,8 +36,6 @@ impl Cpu {
         }
     }
 
-
-
     pub fn get_flag(&self, f: Flag) -> bool {
         self.status & f.mask() != 0
     }
@@ -295,10 +293,7 @@ impl Cpu {
                 self.pc += 1;
 
                 self.set_flag(Flag::I, true);
-                bus.cpu_write(
-                    0x0100 + self.stkp as u16,
-                    ((self.pc >> 8) & 0x00ff) as u8,
-                );
+                bus.cpu_write(0x0100 + self.stkp as u16, ((self.pc >> 8) & 0x00ff) as u8);
                 self.stkp -= 1;
                 bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
                 self.stkp -= 1;
@@ -438,10 +433,7 @@ impl Cpu {
                 // Jump To Sub-Routine
                 self.pc -= 1;
 
-                bus.cpu_write(
-                    0x0100 + self.stkp as u16,
-                    ((self.pc >> 8) & 0x00ff) as u8,
-                );
+                bus.cpu_write(0x0100 + self.stkp as u16, ((self.pc >> 8) & 0x00ff) as u8);
                 self.stkp -= 1;
                 bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
                 self.stkp -= 1;
@@ -710,10 +702,7 @@ impl Cpu {
 
     pub fn irq<T: CpuBus>(&mut self, bus: &mut T) {
         if !self.get_flag(Flag::I) {
-            bus.cpu_write(
-                0x0100 + self.stkp as u16,
-                ((self.pc >> 8) & 0x00ff) as u8,
-            );
+            bus.cpu_write(0x0100 + self.stkp as u16, ((self.pc >> 8) & 0x00ff) as u8);
             self.stkp -= 1;
             bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
             self.stkp -= 1;
@@ -734,10 +723,7 @@ impl Cpu {
     }
 
     pub fn nmi<T: CpuBus>(&mut self, bus: &mut T) {
-        bus.cpu_write(
-            0x0100 + self.stkp as u16,
-            ((self.pc >> 8) & 0x00ff) as u8,
-        );
+        bus.cpu_write(0x0100 + self.stkp as u16, ((self.pc >> 8) & 0x00ff) as u8);
         self.stkp -= 1;
         bus.cpu_write(0x0100 + self.stkp as u16, (self.pc & 0x00ff) as u8);
         self.stkp -= 1;
