@@ -1,12 +1,13 @@
 mod palette;
 
+use crate::cartridge::{self, Cartridge};
 use palette::PALETTE_2C02;
-use std::num::Wrapping;
 use tiny_rng::{Rand, Rng};
 
 pub struct Ppu {
     render_params: PpuRenderParams,
 
+    tbl_pattern: [[u8; 4 * 1024]; 2],
     tbl_name: [[u8; 1024]; 2],
     tbl_palette: [u8; 32],
 
@@ -17,6 +18,9 @@ pub struct Ppu {
 
     rng: Rng,
 }
+
+pub type PatternTable = [[u8; 4 * 128]; 128];
+pub type PixelRgba = [u8; 4];
 
 pub struct PpuRenderParams {
     pub offset_x: usize,
@@ -31,6 +35,7 @@ impl Ppu {
         Ppu {
             render_params,
 
+            tbl_pattern: [[0; 4 * 1024]; 2],
             tbl_name: [[0; 1024]; 2],
             tbl_palette: [0; 32],
 
@@ -89,6 +94,51 @@ impl Ppu {
         }
     }
 
+    pub fn get_pattern_table(
+        &self,
+        cart: &mut Cartridge,
+        table_idx: usize,
+        palette: usize,
+    ) -> PatternTable {
+        let mut table = [[0; 4 * 128]; 128];
+        for tile_y in 0..16 {
+            for tile_x in 0..16 {
+                let offset = tile_y * 256 + tile_x * 16;
+
+                for row in 0..8 {
+                    let mut tile_lsb =
+                        self.ppu_read(cart, (table_idx * 0x1000 + offset + row) as u16);
+                    let mut tile_msb =
+                        self.ppu_read(cart, (table_idx * 0x1000 + offset + row + 8) as u16);
+
+                    for col in 0..8 {
+                        let pixel_value = (tile_lsb & 0x01) + (tile_msb & 0x01);
+                        tile_lsb >>= 1;
+                        tile_msb >>= 1;
+
+                        let pos_x = (tile_x * 8 + (7 - col)) * 4;
+                        let pos_y = tile_y * 8 + row;
+                        table[pos_y][pos_x..pos_x + 4].copy_from_slice(
+                            self.get_color_from_palette(cart, palette, pixel_value),
+                        );
+                    }
+                }
+            }
+        }
+        table
+    }
+
+    pub fn get_color_from_palette(
+        &self,
+        cart: &mut Cartridge,
+        palette: usize,
+        pixel_value: u8,
+    ) -> &PixelRgba {
+        let offset = 0x3f00 + ((palette as u16) << 2) + pixel_value as u16;
+        let color_idx = self.ppu_read(cart, offset);
+        &PALETTE_2C02[color_idx as usize]
+    }
+
     fn set_pixel(&self, frame: &mut [u8], pos: (usize, usize), color_idx: usize) {
         match self.render_params.scaling_factor {
             2 => {
@@ -110,6 +160,53 @@ impl Ppu {
                 frame[off3..off3 + self.render_params.bytes_per_pixel].copy_from_slice(color);
             }
             _ => unreachable!(),
+        }
+    }
+
+    fn ppu_read(&self, cart: &mut Cartridge, mut addr: u16) -> u8 {
+        addr &= 0x3fff;
+
+        if let Some(data) = cart.ppu_read(addr) {
+            data
+        } else {
+            match addr {
+                0x0000..=0x1fff => {
+                    self.tbl_pattern[((addr & 0x1000) >> 12) as usize][(addr & 0x0fff) as usize]
+                }
+                0x2000..=0x3eff => 0,
+                0x3f00..=0x3fff => {
+                    addr &= 0x001f;
+                    addr = match addr {
+                        0x0010 | 0x0014 | 0x0018 | 0x001c => addr - 0x0010,
+                        _ => addr,
+                    };
+                    self.tbl_palette[addr as usize]
+                }
+                _ => 0,
+            }
+        }
+    }
+
+    fn ppu_write(&mut self, cart: &mut Cartridge, mut addr: u16, data: u8) {
+        addr &= 0x3fff;
+
+        if !cart.ppu_write(addr, data) {
+            match addr {
+                0x0000..=0x1fff => {
+                    self.tbl_pattern[((addr >> 0x1000) >> 12) as usize][(addr & 0x0fff) as usize] =
+                        data;
+                }
+                0x2000..=0x3eff => {}
+                0x3f00..=0x3fff => {
+                    addr &= 0x001f;
+                    addr = match addr {
+                        0x0010 | 0x0014 | 0x0018 | 0x001c => addr - 0x0010,
+                        _ => addr,
+                    };
+                    self.tbl_palette[addr as usize] = data;
+                }
+                _ => {}
+            }
         }
     }
 }

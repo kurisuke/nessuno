@@ -1,6 +1,6 @@
 use nessuno::cartridge::Cartridge;
 use nessuno::cpu::{Disassembly, Flag};
-use nessuno::ppu::PpuRenderParams;
+use nessuno::ppu::{PatternTable, PixelRgba, PpuRenderParams};
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
@@ -29,6 +29,7 @@ struct Nessuno {
     run: bool,
     t_residual: f64,
     action: Option<UserAction>,
+    palette_selected: usize,
     paint: bool,
 }
 
@@ -36,6 +37,7 @@ enum UserAction {
     Reset,
     Step,
     Frame,
+    PaletteSelect,
 }
 
 impl Nessuno {
@@ -165,6 +167,70 @@ impl Nessuno {
             );
         }
     }
+
+    fn draw_ppu_data(&mut self, frame: &mut [u8]) {
+        self.draw_pattern_table(frame, 0, 572, 372);
+        self.draw_pattern_table(frame, 1, 756, 372);
+
+        self.text_writer.write(
+            frame,
+            102,
+            30,
+            &format!("p={}", self.palette_selected),
+            &FG_COLOR,
+            &BG_COLOR,
+        );
+
+        for palette in 0..8 {
+            for pixel_value in 0..4 {
+                let color = self
+                    .system
+                    .ppu_get_color_from_palette(palette, pixel_value)
+                    .clone();
+                self.fill_rect(
+                    frame,
+                    572 + palette * 40 + pixel_value as usize * 8,
+                    354,
+                    8,
+                    8,
+                    &color,
+                );
+            }
+        }
+    }
+
+    fn fill_rect(
+        &mut self,
+        frame: &mut [u8],
+        pos_x: usize,
+        pos_y: usize,
+        size_x: usize,
+        size_y: usize,
+        color: &PixelRgba,
+    ) {
+        for y in pos_y..(pos_y + size_y) {
+            for x in pos_x..(pos_x + size_x) {
+                let offset_frame = (y * SCREEN_WIDTH as usize + x) * 4;
+                frame[offset_frame..offset_frame + 4].copy_from_slice(color);
+            }
+        }
+    }
+
+    fn draw_pattern_table(
+        &mut self,
+        frame: &mut [u8],
+        table_idx: usize,
+        pos_x: usize,
+        pos_y: usize,
+    ) {
+        let pattern_table = self
+            .system
+            .ppu_get_pattern_table(table_idx, self.palette_selected);
+        for (offset_y, line) in pattern_table.iter().enumerate() {
+            let offset_frame = ((pos_y + offset_y) * SCREEN_WIDTH as usize + pos_x) * 4;
+            frame[offset_frame..offset_frame + 128 * 4].copy_from_slice(line);
+        }
+    }
 }
 
 impl ScreenBackend for Nessuno {
@@ -184,7 +250,7 @@ impl ScreenBackend for Nessuno {
 
     fn draw(&self, frame: Frame) {
         self.print_reg(frame.frame, 82, 1);
-        self.print_disasm(frame.frame, self.system.cpu.pc, 82, 8, 13);
+        self.print_disasm(frame.frame, self.system.cpu.pc, 82, 8, 7);
     }
 
     fn update(&mut self, frame: Frame, dt: f64) {
@@ -201,12 +267,16 @@ impl ScreenBackend for Nessuno {
                 match *action {
                     UserAction::Reset => {
                         self.system.reset();
+                        self.draw_ppu_data(frame.frame);
                     }
                     UserAction::Step => {
                         self.system.step(frame.frame);
                     }
                     UserAction::Frame => {
                         self.system.frame(frame.frame, true);
+                    }
+                    UserAction::PaletteSelect => {
+                        self.draw_ppu_data(frame.frame);
                     }
                 }
                 self.action = None;
@@ -229,6 +299,10 @@ impl ScreenBackend for Nessuno {
             self.action = Some(UserAction::Frame);
         } else if input.key_pressed(VirtualKeyCode::S) {
             self.action = Some(UserAction::Step);
+        } else if input.key_pressed(VirtualKeyCode::P) {
+            self.palette_selected += 1;
+            self.palette_selected &= 0x07;
+            self.action = Some(UserAction::PaletteSelect);
         }
     }
 }
@@ -260,6 +334,7 @@ impl Nessuno {
             run: false,
             t_residual: 0f64,
             action: Some(UserAction::Reset),
+            palette_selected: 0,
             paint: false,
         }
     }

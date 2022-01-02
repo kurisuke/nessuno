@@ -1,7 +1,7 @@
 use crate::bus::CpuBus;
 use crate::cartridge::Cartridge;
 use crate::cpu::{Cpu, Disassembly};
-use crate::ppu::{Ppu, PpuRenderParams};
+use crate::ppu::{PatternTable, PixelRgba, Ppu, PpuRenderParams};
 
 pub struct System {
     pub cpu: Cpu,
@@ -88,6 +88,18 @@ impl System {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         self.bus.cpu_read(addr)
+    }
+
+    pub fn ppu_get_pattern_table(&mut self, table_idx: usize, palette: usize) -> PatternTable {
+        self.bus
+            .ppu
+            .get_pattern_table(&mut self.bus.cart, table_idx, palette)
+    }
+
+    pub fn ppu_get_color_from_palette(&mut self, palette: usize, pixel_value: u8) -> &PixelRgba {
+        self.bus
+            .ppu
+            .get_color_from_palette(&mut self.bus.cart, palette, pixel_value)
     }
 }
 

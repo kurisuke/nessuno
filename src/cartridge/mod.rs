@@ -60,7 +60,7 @@ impl Cartridge {
         let mapper_id = ((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4);
         let mapper = match mapper_id {
             0 => Box::new(Mapper000::new(header.prg_rom_chunks, header.chr_rom_chunks)),
-            _ => unreachable!(),
+            _ => panic!("Unsupported mapper: {}", mapper_id),
         };
 
         let file_type = 1;
