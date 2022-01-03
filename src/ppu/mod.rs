@@ -1117,7 +1117,7 @@ impl OamEntry {
 
     pub fn debug_string(&self) -> String {
         format!(
-            "({}, {}) ID: {:02x} AT: {:02x}",
+            "({:03}, {:03}) ID: {:02x} AT: {:02x}",
             self.bytes[3], self.bytes[0], self.bytes[1], self.bytes[2]
         )
     }

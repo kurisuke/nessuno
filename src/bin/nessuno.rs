@@ -30,6 +30,7 @@ struct Nessuno {
     run: bool,
     t_residual: f64,
     action: Option<UserAction>,
+    display_oam: bool,
     palette_selected: usize,
     paint: bool,
 }
@@ -37,7 +38,6 @@ struct Nessuno {
 enum UserAction {
     Reset,
     Step,
-    Step256,
     Frame,
     PaletteSelect,
 }
@@ -125,7 +125,7 @@ impl Nessuno {
                 frame,
                 pos_x,
                 pos_y + n as i32,
-                &self.system.ppu_debug_oam(n),
+                &format!("{:30}", &self.system.ppu_debug_oam(n)),
                 &FG_COLOR,
                 &BG_COLOR,
             );
@@ -257,7 +257,16 @@ impl ScreenBackend for Nessuno {
             frame.frame,
             5,
             37,
-            "SPACE = run/pause      S = step      R = reset      F = frame      ESC = quit",
+            "SPACE = run/pause      R = reset      S = step      T = toggle oam/disasm      F = frame      ESC = quit",
+            &FG_COLOR,
+            &BG_COLOR,
+        );
+
+        self.text_writer.write(
+            frame.frame,
+            112,
+            1,
+            "Controller 1\nArrow Keys - Joypad\n1 - B\n2 - A\n3 - Select\n4 - Start",
             &FG_COLOR,
             &BG_COLOR,
         );
@@ -265,8 +274,11 @@ impl ScreenBackend for Nessuno {
 
     fn draw(&self, frame: Frame) {
         self.print_reg(frame.frame, 82, 1);
-        // self.print_disasm(frame.frame, self.system.cpu.pc, 82, 8, 7);
-        self.print_oam(frame.frame, 82, 8, 15);
+        if self.display_oam {
+            self.print_oam(frame.frame, 82, 8, 15);
+        } else {
+            self.print_disasm(frame.frame, self.system.cpu.pc, 82, 8, 7);
+        }
     }
 
     fn update(&mut self, frame: Frame, dt: f64) {
@@ -287,9 +299,6 @@ impl ScreenBackend for Nessuno {
                     }
                     UserAction::Step => {
                         self.system.step(frame.frame);
-                    }
-                    UserAction::Step256 => {
-                        self.system.step_count(frame.frame, 256);
                     }
                     UserAction::Frame => {
                         self.system.frame(frame.frame, true);
@@ -348,7 +357,7 @@ impl ScreenBackend for Nessuno {
         } else if input.key_pressed(VirtualKeyCode::S) {
             self.action = Some(UserAction::Step);
         } else if input.key_pressed(VirtualKeyCode::T) {
-            self.action = Some(UserAction::Step256);
+            self.display_oam = !self.display_oam;
         } else if input.key_pressed(VirtualKeyCode::P) {
             self.palette_selected += 1;
             self.palette_selected &= 0x07;
@@ -384,6 +393,7 @@ impl Nessuno {
             run: false,
             t_residual: 0f64,
             action: Some(UserAction::Reset),
+            display_oam: false,
             palette_selected: 0,
             paint: false,
         }
