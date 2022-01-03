@@ -75,7 +75,7 @@ impl Cartridge {
 
         let mapper = match mapper_id {
             0 => Box::new(Mapper000::new(header.prg_rom_chunks, header.chr_rom_chunks)),
-            _ => panic!("Unsupported mapper: {}", mapper_id),
+            _ => panic!("Unsupported mapper: {:03}", mapper_id),
         };
 
         let file_type = 1;
