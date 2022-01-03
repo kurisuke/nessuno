@@ -119,6 +119,19 @@ impl Nessuno {
         }
     }
 
+    fn print_oam(&self, frame: &mut [u8], pos_x: i32, pos_y: i32, num_entries: usize) {
+        for n in 0..num_entries {
+            self.text_writer.write(
+                frame,
+                pos_x,
+                pos_y + n as i32,
+                &self.system.ppu_debug_oam(n),
+                &FG_COLOR,
+                &BG_COLOR,
+            );
+        }
+    }
+
     fn print_disasm(&self, frame: &mut [u8], addr: u16, pos_x: i32, pos_y: i32, range: usize) {
         // current position
         self.text_writer.write(
@@ -252,7 +265,8 @@ impl ScreenBackend for Nessuno {
 
     fn draw(&self, frame: Frame) {
         self.print_reg(frame.frame, 82, 1);
-        self.print_disasm(frame.frame, self.system.cpu.pc, 82, 8, 7);
+        // self.print_disasm(frame.frame, self.system.cpu.pc, 82, 8, 7);
+        self.print_oam(frame.frame, 82, 8, 15);
     }
 
     fn update(&mut self, frame: Frame, dt: f64) {
@@ -314,10 +328,10 @@ impl ScreenBackend for Nessuno {
             input_c1.push(ControllerInput::A);
         }
         if input.key_held(VirtualKeyCode::Key3) {
-            input_c1.push(ControllerInput::Start);
+            input_c1.push(ControllerInput::Select);
         }
         if input.key_held(VirtualKeyCode::Key4) {
-            input_c1.push(ControllerInput::Select);
+            input_c1.push(ControllerInput::Start);
         }
         self.system.controller_update(&input_c1, &vec![]);
 

@@ -16,6 +16,12 @@ struct Bus {
     ppu: Ppu,
     cart: Cartridge,
     controller: [Controller; 2],
+
+    dma_page: u8,
+    dma_addr: u8,
+    dma_data: u8,
+    dma_transfer: bool,
+    dma_dummy: bool,
 }
 
 impl System {
@@ -27,6 +33,12 @@ impl System {
                 ppu: Ppu::new(render_params),
                 cart,
                 controller: [Controller::new(), Controller::new()],
+
+                dma_page: 0x00,
+                dma_addr: 0x00,
+                dma_data: 0x00,
+                dma_transfer: false,
+                dma_dummy: true,
             },
             clock_counter: 0,
         }
@@ -35,7 +47,32 @@ impl System {
     pub fn clock(&mut self, frame: &mut [u8]) {
         let nmi = self.bus.ppu.clock(&mut self.bus.cart, frame);
         if self.clock_counter % 3 == 0 {
-            self.cpu.clock(&mut self.bus);
+            if self.bus.dma_transfer {
+                if self.bus.dma_dummy {
+                    if self.clock_counter % 2 == 1 {
+                        self.bus.dma_dummy = false;
+                    }
+                } else {
+                    if self.clock_counter % 2 == 0 {
+                        // even cycle: read from cpu
+                        self.bus.dma_data = self.bus.cpu_read(
+                            ((self.bus.dma_page as u16) << 8) | (self.bus.dma_addr as u16),
+                        );
+                    } else {
+                        // odd cycle: write to ppu
+                        self.bus.ppu.write_oam(self.bus.dma_addr, self.bus.dma_data);
+                        if self.bus.dma_addr == 255 {
+                            self.bus.dma_addr = 0;
+                            self.bus.dma_transfer = false;
+                            self.bus.dma_dummy = true;
+                        } else {
+                            self.bus.dma_addr += 1;
+                        }
+                    }
+                }
+            } else {
+                self.cpu.clock(&mut self.bus);
+            }
         }
 
         if nmi {
@@ -121,6 +158,10 @@ impl System {
         self.bus.controller[0].update(input1);
         self.bus.controller[1].update(input2);
     }
+
+    pub fn ppu_debug_oam(&self, entry: usize) -> String {
+        self.bus.ppu.debug_oam(entry)
+    }
 }
 
 impl CpuBus for Bus {
@@ -133,6 +174,11 @@ impl CpuBus for Bus {
                 }
                 0x2000..=0x3fff => {
                     self.ppu.cpu_write(&mut self.cart, addr & 0x0007, data);
+                }
+                0x4014 => {
+                    self.dma_page = data;
+                    self.dma_addr = 0x00;
+                    self.dma_transfer = true;
                 }
                 0x4016..=0x4017 => {
                     self.controller[(addr & 0x0001) as usize].write();

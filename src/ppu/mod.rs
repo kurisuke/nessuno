@@ -40,7 +40,13 @@ pub struct Ppu {
     bg_shifter_attrib_lo: u16,
     bg_shifter_attrib_hi: u16,
 
-    rng: Rng,
+    oam: [OamEntry; 64],
+    oam_addr: u8,
+
+    sprite_scanline: [OamEntry; 8],
+    sprite_count: usize,
+    sprite_shifter_pattern_lo: [u8; 8],
+    sprite_shifter_pattern_hi: [u8; 8],
 }
 
 pub type PatternTable = [[u8; 4 * 128]; 128];
@@ -88,7 +94,17 @@ impl Ppu {
             bg_shifter_attrib_lo: 0x0000,
             bg_shifter_attrib_hi: 0x0000,
 
-            rng: Rng::from_seed(123456789),
+            oam: [OamEntry {
+                bytes: [0, 0, 0, 0],
+            }; 64],
+            oam_addr: 0x00,
+
+            sprite_scanline: [OamEntry {
+                bytes: [0, 0, 0, 0],
+            }; 8],
+            sprite_count: 0,
+            sprite_shifter_pattern_lo: [0x00; 8],
+            sprite_shifter_pattern_hi: [0x00; 8],
         }
     }
 
@@ -111,6 +127,16 @@ impl Ppu {
         self.control.reg = 0x00;
         self.vram_addr.reg = 0x0000;
         self.tram_addr.reg = 0x0000;
+        self.oam = [OamEntry {
+            bytes: [0, 0, 0, 0],
+        }; 64];
+        self.oam_addr = 0x00;
+        self.sprite_scanline = [OamEntry {
+            bytes: [0, 0, 0, 0],
+        }; 8];
+        self.sprite_count = 0;
+        self.sprite_shifter_pattern_lo = [0x00; 8];
+        self.sprite_shifter_pattern_hi = [0x00; 8];
     }
 
     pub fn clock(&mut self, cart: &mut Cartridge, frame: &mut [u8]) -> bool {
@@ -124,8 +150,14 @@ impl Ppu {
                 }
 
                 if self.scanline == -1 && self.cycle == 1 {
-                    // start of new cycle, clear vblank flag
+                    // start of new cycle, clear flags
                     self.status.set_flag(StatusRegFlag::VerticalBlank, false);
+                    self.status.set_flag(StatusRegFlag::SpriteOverflow, false);
+
+                    for i in 0..8 {
+                        self.sprite_shifter_pattern_lo[i] = 0;
+                        self.sprite_shifter_pattern_hi[i] = 0;
+                    }
                 }
 
                 if (self.cycle >= 2 && self.cycle < 258) || (self.cycle >= 321 && self.cycle < 338)
@@ -197,6 +229,108 @@ impl Ppu {
                 if self.scanline == -1 && self.cycle >= 280 && self.cycle < 305 {
                     self.transfer_address_y();
                 }
+
+                // FOREGROUND RENDERING
+                if self.cycle == 257 && self.scanline >= 0 {
+                    for s in self.sprite_scanline.iter_mut() {
+                        s.clear(0xff);
+                    }
+
+                    self.sprite_count = 0;
+                    let sprite_size = if self.control.get_flag(ControlRegFlag::SpriteSize) {
+                        16
+                    } else {
+                        8
+                    };
+                    for oam_entry in self.oam.iter() {
+                        let diff = self.scanline - oam_entry.y() as isize;
+                        if diff >= 0 && diff < sprite_size {
+                            if self.sprite_count < 8 {
+                                self.sprite_scanline[self.sprite_count] = *oam_entry;
+                                self.sprite_count += 1
+                            }
+                            if self.sprite_count >= 8 {
+                                break;
+                            }
+                        }
+                    }
+                    self.status
+                        .set_flag(StatusRegFlag::SpriteOverflow, self.sprite_count >= 8);
+                }
+
+                if self.cycle == 340 {
+                    for (i, s) in self
+                        .sprite_scanline
+                        .iter()
+                        .take(self.sprite_count)
+                        .enumerate()
+                    {
+                        let scanline_diff = self.scanline - s.y() as isize;
+
+                        let sprite_pattern_addr_lo =
+                            if !self.control.get_flag(ControlRegFlag::SpriteSize) {
+                                // 8x8 sprites
+                                if s.attrib() & 0x80 == 0 {
+                                    // not vertically flipped, i.e. normal
+                                    ((self.control.get_flag(ControlRegFlag::PatternSprite) as u16)
+                                        << 12)
+                                        | ((s.id() as u16) << 4)
+                                        | (scanline_diff & 0x07) as u16
+                                } else {
+                                    // vertically flipped
+                                    ((self.control.get_flag(ControlRegFlag::PatternSprite) as u16)
+                                        << 12)
+                                        | ((s.id() as u16) << 4)
+                                        | ((7 - scanline_diff) & 0x07) as u16
+                                }
+                            } else {
+                                // 8x16 sprites
+                                if s.attrib() & 0x80 == 0 {
+                                    // not vertically flipped, i.e. normal
+                                    if scanline_diff < 8 {
+                                        // top half tile
+                                        (((s.id() & 0x01) as u16) << 12)
+                                            | (((s.id() & 0xfe) as u16) << 4)
+                                            | (scanline_diff & 0x07) as u16
+                                    } else {
+                                        (((s.id() & 0x01) as u16) << 12)
+                                            | (((s.id() & 0xfe) as u16 + 1) << 4)
+                                            | (scanline_diff & 0x07) as u16
+                                    }
+                                } else {
+                                    // vertically flipped
+                                    if scanline_diff < 8 {
+                                        // top half tile
+                                        (((s.id() & 0x01) as u16) << 12)
+                                            | (((s.id() & 0xfe) as u16) << 4)
+                                            | ((7 - scanline_diff) & 0x07) as u16
+                                    } else {
+                                        (((s.id() & 0x01) as u16) << 12)
+                                            | (((s.id() & 0xfe) as u16 + 1) << 4)
+                                            | ((7 - scanline_diff) & 0x07) as u16
+                                    }
+                                }
+                            };
+                        let sprite_pattern_addr_hi = sprite_pattern_addr_lo + 8;
+                        let sprite_pattern_bits_lo = self.ppu_read(cart, sprite_pattern_addr_lo);
+                        let sprite_pattern_bits_hi = self.ppu_read(cart, sprite_pattern_addr_hi);
+
+                        let (sprite_pattern_bits_lo, sprite_pattern_bits_hi) =
+                            if s.attrib() & 0x40 > 0 {
+                                // horizontally flipped
+                                (
+                                    sprite_pattern_bits_lo.reverse_bits(),
+                                    sprite_pattern_bits_hi.reverse_bits(),
+                                )
+                            } else {
+                                // not flipped
+                                (sprite_pattern_bits_lo, sprite_pattern_bits_hi)
+                            };
+
+                        self.sprite_shifter_pattern_lo[i] = sprite_pattern_bits_lo;
+                        self.sprite_shifter_pattern_hi[i] = sprite_pattern_bits_hi;
+                    }
+                }
             }
             240 => {
                 // Post render scanline - do nothing
@@ -217,10 +351,8 @@ impl Ppu {
         }
 
         if let Some(pos) = visible(self.scanline, self.cycle) {
-            // let color = self.rng.rand_usize() & 0x3f;
-            // self.set_pixel(frame, pos, color);
-
-            if self.mask.get_flag(MaskRegFlag::RenderBg) {
+            // BACKGROUND
+            let (bg_palette, bg_palette_idx) = if self.mask.get_flag(MaskRegFlag::RenderBg) {
                 // fine x scrolling
                 let bit_mux = 0x8000 >> self.fine_x;
 
@@ -233,10 +365,65 @@ impl Ppu {
                 let bg_pal0 = ((self.bg_shifter_attrib_lo & bit_mux) != 0) as u8;
                 let bg_pal1 = ((self.bg_shifter_attrib_hi & bit_mux) != 0) as u8;
                 let bg_palette = (bg_pal1 << 1) | bg_pal0;
+                (bg_palette, bg_palette_idx)
+            } else {
+                (0x00, 0x00)
+            };
 
-                let color = self.get_color_from_palette(cart, bg_palette as usize, bg_palette_idx);
-                self.set_pixel(frame, pos, color);
-            }
+            // FOREGROUND
+            let (fg_palette, fg_palette_idx, fg_priority) = if self
+                .mask
+                .get_flag(MaskRegFlag::RenderSprites)
+            {
+                let mut fg_palette = 0x00;
+                let mut fg_palette_idx = 0x00;
+                let mut fg_priority = false;
+                for (i, s) in self
+                    .sprite_scanline
+                    .iter_mut()
+                    .take(self.sprite_count)
+                    .enumerate()
+                {
+                    if s.x() == 0 {
+                        let fg_pixel_lo = ((self.sprite_shifter_pattern_lo[i] & 0x80) != 0) as u8;
+                        let fg_pixel_hi = ((self.sprite_shifter_pattern_hi[i] & 0x80) != 0) as u8;
+                        fg_palette_idx = (fg_pixel_hi << 1) | fg_pixel_lo;
+
+                        fg_palette = (s.attrib() & 0x03) + 0x04;
+                        fg_priority = (s.attrib() & 0x20) == 0;
+
+                        if fg_palette_idx != 0 {
+                            break;
+                        }
+                    }
+                }
+                (fg_palette, fg_palette_idx, fg_priority)
+            } else {
+                (0x00, 0x00, false)
+            };
+
+            let (palette, palette_idx) = if bg_palette_idx == 0 && fg_palette_idx == 0 {
+                // both transparent, draw background
+                (0x00, 0x00)
+            } else if bg_palette_idx == 0 && fg_palette_idx > 0 {
+                // bg transparent, fg visible -> fg wins
+                (fg_palette, fg_palette_idx)
+            } else if bg_palette_idx > 0 && fg_palette_idx == 0 {
+                // bg visible, fg transparent -> bg wins
+                (bg_palette, bg_palette_idx)
+            } else if bg_palette_idx > 0 && fg_palette_idx > 0 {
+                // both visible -> eval fg priority flag
+                if fg_priority {
+                    (fg_palette, fg_palette_idx)
+                } else {
+                    (bg_palette, bg_palette_idx)
+                }
+            } else {
+                unreachable!()
+            };
+
+            let color = self.get_color_from_palette(cart, palette as usize, palette_idx);
+            self.set_pixel(frame, pos, color);
         }
 
         self.cycle += 1;
@@ -341,6 +528,22 @@ impl Ppu {
             self.bg_shifter_attrib_lo <<= 1;
             self.bg_shifter_attrib_hi <<= 1;
         }
+
+        if self.mask.get_flag(MaskRegFlag::RenderSprites) && self.cycle >= 1 && self.cycle < 258 {
+            for (i, s) in self
+                .sprite_scanline
+                .iter_mut()
+                .take(self.sprite_count)
+                .enumerate()
+            {
+                if s.x() > 0 {
+                    s.dec_x();
+                } else {
+                    self.sprite_shifter_pattern_lo[i] <<= 1;
+                    self.sprite_shifter_pattern_hi[i] <<= 1;
+                }
+            }
+        }
     }
 
     pub fn cpu_read(&mut self, cart: &mut Cartridge, addr: u16) -> u8 {
@@ -364,7 +567,12 @@ impl Ppu {
                 data
             }
             0x0003 => 0x00, // OAM Address
-            0x0004 => 0x00, // OAM Data
+            0x0004 => {
+                // OAM Data
+                let entry = self.oam_addr / 4;
+                let offset = self.oam_addr % 4;
+                self.oam[entry as usize].bytes[offset as usize]
+            }
             0x0005 => 0x00, // Scroll - not readable
             0x0006 => 0x00, // PPU Address - not readable
             0x0007 => {
@@ -434,9 +642,13 @@ impl Ppu {
             }
             0x0003 => {
                 // OAM Address
+                self.oam_addr = data;
             }
             0x0004 => {
                 // OAM Data
+                let entry = self.oam_addr / 4;
+                let offset = self.oam_addr % 4;
+                self.oam[entry as usize].bytes[offset as usize] = data;
             }
             0x0005 => {
                 // Scroll
@@ -477,6 +689,16 @@ impl Ppu {
         }
     }
 
+    pub fn write_oam(&mut self, addr: u8, data: u8) {
+        let entry = addr / 4;
+        let offset = addr % 4;
+        self.oam[entry as usize].bytes[offset as usize] = data;
+    }
+
+    pub fn debug_oam(&self, entry: usize) -> String {
+        format!("{:02x}: {}", entry, self.oam[entry].debug_string())
+    }
+
     pub fn get_pattern_table(
         &self,
         cart: &mut Cartridge,
@@ -495,7 +717,7 @@ impl Ppu {
                         self.ppu_read(cart, (table_idx * 0x1000 + offset + row + 8) as u16);
 
                     for col in 0..8 {
-                        let pixel_value = (tile_lsb & 0x01) + (tile_msb & 0x01);
+                        let pixel_value = ((tile_lsb & 0x01) << 1) | (tile_msb & 0x01);
                         tile_lsb >>= 1;
                         tile_msb >>= 1;
 
@@ -825,6 +1047,47 @@ impl LoopyReg {
     fn set_fine_y(&mut self, v: u16) {
         self.reg &= 0x8fff;
         self.reg |= (v << 12) & 0x7000;
+    }
+}
+
+#[derive(Copy, Clone)]
+struct OamEntry {
+    pub bytes: [u8; 4],
+}
+
+impl OamEntry {
+    pub fn y(&self) -> u8 {
+        self.bytes[0]
+    }
+
+    pub fn id(&self) -> u8 {
+        self.bytes[1]
+    }
+
+    pub fn attrib(&self) -> u8 {
+        self.bytes[2]
+    }
+
+    pub fn x(&self) -> u8 {
+        self.bytes[3]
+    }
+
+    pub fn dec_x(&mut self) {
+        self.bytes[3] -= 1;
+    }
+
+    pub fn clear(&mut self, v: u8) {
+        self.bytes[0] = v;
+        self.bytes[1] = v;
+        self.bytes[2] = v;
+        self.bytes[3] = v;
+    }
+
+    pub fn debug_string(&self) -> String {
+        format!(
+            "({}, {}) ID: {:02x} AT: {:02x}",
+            self.bytes[3], self.bytes[0], self.bytes[1], self.bytes[2]
+        )
     }
 }
 
