@@ -1,5 +1,6 @@
 use crate::bus::CpuBus;
 use crate::cartridge::Cartridge;
+use crate::controller::{Controller, ControllerInput};
 use crate::cpu::{Cpu, Disassembly};
 use crate::ppu::{PatternTable, PixelRgba, Ppu, PpuRenderParams};
 
@@ -14,6 +15,7 @@ struct Bus {
     ram_cpu: [u8; 2 * 1024],
     ppu: Ppu,
     cart: Cartridge,
+    controller: [Controller; 2],
 }
 
 impl System {
@@ -24,6 +26,7 @@ impl System {
                 ram_cpu: [0; 2 * 1024],
                 ppu: Ppu::new(render_params),
                 cart,
+                controller: [Controller::new(), Controller::new()],
             },
             clock_counter: 0,
         }
@@ -74,6 +77,12 @@ impl System {
         }
     }
 
+    pub fn step_count(&mut self, frame: &mut [u8], count: usize) {
+        for _ in 0..count {
+            self.step(frame);
+        }
+    }
+
     pub fn reset(&mut self) {
         self.cpu.reset(&mut self.bus);
         self.bus.ppu.reset();
@@ -107,6 +116,11 @@ impl System {
             .ppu
             .get_color_from_palette(&mut self.bus.cart, palette, pixel_value)
     }
+
+    pub fn controller_update(&mut self, input1: &[ControllerInput], input2: &[ControllerInput]) {
+        self.bus.controller[0].update(input1);
+        self.bus.controller[1].update(input2);
+    }
 }
 
 impl CpuBus for Bus {
@@ -119,6 +133,9 @@ impl CpuBus for Bus {
                 }
                 0x2000..=0x3fff => {
                     self.ppu.cpu_write(&mut self.cart, addr & 0x0007, data);
+                }
+                0x4016..=0x4017 => {
+                    self.controller[(addr & 0x0001) as usize].write();
                 }
                 _ => {}
             }
@@ -133,6 +150,7 @@ impl CpuBus for Bus {
                 // CPU Ram
                 0x0000..=0x1fff => self.ram_cpu[(addr & 0x07ff) as usize],
                 0x2000..=0x3fff => self.ppu.cpu_read(&mut self.cart, addr & 0x0007),
+                0x4016..=0x4017 => self.controller[(addr & 0x0001) as usize].read(),
                 _ => 0,
             }
         }
@@ -146,6 +164,7 @@ impl CpuBus for Bus {
                 // CPU Ram
                 0x0000..=0x1fff => self.ram_cpu[(addr & 0x07ff) as usize],
                 0x2000..=0x3fff => self.ppu.cpu_read_ro(addr & 0x0007),
+                0x4016..=0x4017 => self.controller[(addr & 0x0001) as usize].read_ro(),
                 _ => 0,
             }
         }

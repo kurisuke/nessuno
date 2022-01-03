@@ -547,7 +547,7 @@ impl Cpu {
                 // Rotate Right
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = ((self.fetched as u16) >> 1) | ((self.get_flag(Flag::C) as u16) << 7);
-                self.set_flag(Flag::C, tmp & 0xff00 != 0);
+                self.set_flag(Flag::C, self.fetched & 0x01 != 0);
                 self.set_flag(Flag::Z, tmp & 0x00ff == 0);
                 self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 if instr.addr_mode == AddrMode::Imp {
@@ -576,6 +576,8 @@ impl Cpu {
                 self.pc = bus.cpu_read(0x100 + self.stkp as u16) as u16;
                 self.stkp += 1;
                 self.pc |= (bus.cpu_read(0x100 + self.stkp as u16) as u16) << 8;
+
+                self.pc += 1;
                 false
             }
             &Op::Sbc => {
@@ -587,7 +589,7 @@ impl Cpu {
                     + Wrapping(inv)
                     + Wrapping(self.get_flag(Flag::C) as u16))
                 .0;
-                self.set_flag(Flag::C, tmp > 0x00ff);
+                self.set_flag(Flag::C, tmp & 0xff00 != 0);
                 self.set_flag(Flag::Z, tmp & 0x00ff == 0);
                 self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 self.set_flag(
@@ -693,6 +695,7 @@ impl Cpu {
         let lo = bus.cpu_read(self.addr_abs) as u16;
         let hi = bus.cpu_read(self.addr_abs + 1) as u16;
         self.pc = (hi << 8) | lo;
+        // self.pc = 0x8000;
 
         self.addr_rel = 0x0000;
         self.addr_abs = 0x0000;

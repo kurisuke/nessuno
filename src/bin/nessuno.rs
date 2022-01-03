@@ -1,6 +1,7 @@
 use nessuno::cartridge::Cartridge;
+use nessuno::controller::ControllerInput;
 use nessuno::cpu::{Disassembly, Flag};
-use nessuno::ppu::{PatternTable, PixelRgba, PpuRenderParams};
+use nessuno::ppu::{PixelRgba, PpuRenderParams};
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
@@ -36,6 +37,7 @@ struct Nessuno {
 enum UserAction {
     Reset,
     Step,
+    Step256,
     Frame,
     PaletteSelect,
 }
@@ -272,6 +274,9 @@ impl ScreenBackend for Nessuno {
                     UserAction::Step => {
                         self.system.step(frame.frame);
                     }
+                    UserAction::Step256 => {
+                        self.system.step_count(frame.frame, 256);
+                    }
                     UserAction::Frame => {
                         self.system.frame(frame.frame, true);
                     }
@@ -288,6 +293,35 @@ impl ScreenBackend for Nessuno {
     }
 
     fn handle_input(&mut self, input: &WinitInputHelper) {
+        // CONTROLLER INPUT
+        let mut input_c1 = vec![];
+        if input.key_held(VirtualKeyCode::Left) {
+            input_c1.push(ControllerInput::Left);
+        }
+        if input.key_held(VirtualKeyCode::Right) {
+            input_c1.push(ControllerInput::Right);
+        }
+        if input.key_held(VirtualKeyCode::Up) {
+            input_c1.push(ControllerInput::Up);
+        }
+        if input.key_held(VirtualKeyCode::Down) {
+            input_c1.push(ControllerInput::Down);
+        }
+        if input.key_held(VirtualKeyCode::Key1) {
+            input_c1.push(ControllerInput::B);
+        }
+        if input.key_held(VirtualKeyCode::Key2) {
+            input_c1.push(ControllerInput::A);
+        }
+        if input.key_held(VirtualKeyCode::Key3) {
+            input_c1.push(ControllerInput::Start);
+        }
+        if input.key_held(VirtualKeyCode::Key4) {
+            input_c1.push(ControllerInput::Select);
+        }
+        self.system.controller_update(&input_c1, &vec![]);
+
+        // DEBUG KEYS
         if input.key_pressed(VirtualKeyCode::Space) {
             self.run = !self.run;
             if !self.run {
@@ -299,6 +333,8 @@ impl ScreenBackend for Nessuno {
             self.action = Some(UserAction::Frame);
         } else if input.key_pressed(VirtualKeyCode::S) {
             self.action = Some(UserAction::Step);
+        } else if input.key_pressed(VirtualKeyCode::T) {
+            self.action = Some(UserAction::Step256);
         } else if input.key_pressed(VirtualKeyCode::P) {
             self.palette_selected += 1;
             self.palette_selected &= 0x07;
