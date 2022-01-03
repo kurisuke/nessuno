@@ -257,7 +257,7 @@ impl ScreenBackend for Nessuno {
             frame.frame,
             5,
             37,
-            "SPACE = run/pause      R = reset      S = step      T = toggle oam/disasm      F = frame      ESC = quit",
+            "SPACE = run/pause      R = reset      S = step      F = frame      T = toggle oam/disasm      F11 = fullscreen      ESC = quit",
             &FG_COLOR,
             &BG_COLOR,
         );
