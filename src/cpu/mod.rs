@@ -511,6 +511,7 @@ impl Cpu {
                 );
                 self.set_flag(Flag::B, false);
                 self.set_flag(Flag::U, false);
+                self.stkp -= 1;
                 false
             }
             &Op::Pla => {
