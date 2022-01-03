@@ -5,6 +5,8 @@ use std::io::Read;
 use std::mem;
 
 pub struct Cartridge {
+    pub mirror: Mirror,
+
     mem_prg: Vec<u8>,
     mem_chr: Vec<u8>,
 
@@ -13,6 +15,13 @@ pub struct Cartridge {
     num_banks_chr: u8,
 
     mapper: Box<dyn Mapper>,
+}
+
+pub enum Mirror {
+    Vertical,
+    Horizontal,
+    OneScreenLo,
+    OneScreenHi,
 }
 
 struct CartridgeHeader {
@@ -58,6 +67,12 @@ impl Cartridge {
             let _junk = reader.seek_relative(512)?;
         }
         let mapper_id = ((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4);
+        let mirror = if header.mapper1 & 0x01 != 0 {
+            Mirror::Vertical
+        } else {
+            Mirror::Horizontal
+        };
+
         let mapper = match mapper_id {
             0 => Box::new(Mapper000::new(header.prg_rom_chunks, header.chr_rom_chunks)),
             _ => panic!("Unsupported mapper: {}", mapper_id),
@@ -81,6 +96,7 @@ impl Cartridge {
                     mem_prg,
                     mem_chr,
                     mapper_id,
+                    mirror,
                     num_banks_prg,
                     num_banks_chr,
                     mapper,

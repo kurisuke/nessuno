@@ -1,8 +1,12 @@
 mod palette;
 
-use crate::cartridge::{self, Cartridge};
+use std::ops::Add;
+
+use crate::cartridge::{Cartridge, Mirror};
+use crate::cpu::Cpu;
 use palette::PALETTE_2C02;
 use tiny_rng::{Rand, Rng};
+use winit::platform::unix::x11::util::StateOperation;
 
 pub struct Ppu {
     render_params: PpuRenderParams,
@@ -13,8 +17,28 @@ pub struct Ppu {
 
     pub frame_complete: bool,
 
-    scanline: usize,
+    scanline: isize,
     cycle: usize,
+
+    control: ControlReg,
+    mask: MaskReg,
+    status: StatusReg,
+
+    vram_addr: LoopyReg,
+    tram_addr: LoopyReg,
+    fine_x: u8,
+
+    address_latch: bool,
+    ppu_data_buffer: u8,
+
+    bg_next_tile_id: u8,
+    bg_next_tile_attrib: u8,
+    bg_next_tile_lsb: u8,
+    bg_next_tile_msb: u8,
+    bg_shifter_pattern_lo: u16,
+    bg_shifter_pattern_hi: u16,
+    bg_shifter_attrib_lo: u16,
+    bg_shifter_attrib_hi: u16,
 
     rng: Rng,
 }
@@ -44,66 +68,411 @@ impl Ppu {
             cycle: 0,
             scanline: 0,
 
+            control: ControlReg { reg: 0x00 },
+            mask: MaskReg { reg: 0x00 },
+            status: StatusReg { reg: 0x00 },
+
+            vram_addr: LoopyReg { reg: 0x0000 },
+            tram_addr: LoopyReg { reg: 0x0000 },
+            fine_x: 0x00,
+
+            address_latch: false,
+            ppu_data_buffer: 0x00,
+
+            bg_next_tile_id: 0x00,
+            bg_next_tile_attrib: 0x00,
+            bg_next_tile_lsb: 0x00,
+            bg_next_tile_msb: 0x00,
+            bg_shifter_pattern_lo: 0x0000,
+            bg_shifter_pattern_hi: 0x0000,
+            bg_shifter_attrib_lo: 0x0000,
+            bg_shifter_attrib_hi: 0x0000,
+
             rng: Rng::from_seed(123456789),
         }
     }
 
-    pub fn clock(&mut self, frame: &mut [u8]) {
+    pub fn reset(&mut self) {
+        self.fine_x = 0x00;
+        self.address_latch = false;
+        self.ppu_data_buffer = 0x00;
+        self.scanline = 0;
+        self.cycle = 0;
+        self.bg_next_tile_id = 0x00;
+        self.bg_next_tile_attrib = 0x00;
+        self.bg_next_tile_lsb = 0x00;
+        self.bg_next_tile_msb = 0x00;
+        self.bg_shifter_pattern_lo = 0x0000;
+        self.bg_shifter_pattern_hi = 0x0000;
+        self.bg_shifter_attrib_lo = 0x0000;
+        self.bg_shifter_attrib_hi = 0x0000;
+        self.status.reg = 0x00;
+        self.mask.reg = 0x00;
+        self.control.reg = 0x00;
+        self.vram_addr.reg = 0x0000;
+        self.tram_addr.reg = 0x0000;
+    }
+
+    pub fn clock(&mut self, cart: &mut Cartridge, frame: &mut [u8]) -> bool {
+        let mut nmi = false;
+
+        match self.scanline {
+            -1..=239 => {
+                if self.scanline == 0 && self.cycle == 0 {
+                    // "Odd frame" cycle skip
+                    self.cycle = 1;
+                }
+
+                if self.scanline == -1 && self.cycle == 1 {
+                    // start of new cycle, clear vblank flag
+                    self.status.set_flag(StatusRegFlag::VerticalBlank, false);
+                }
+
+                if (self.cycle >= 2 && self.cycle < 258) || (self.cycle >= 321 && self.cycle < 338)
+                {
+                    self.update_shifters();
+
+                    match (self.cycle - 1) % 8 {
+                        0 => {
+                            // Fetch next bg tile id
+                            self.load_bg_shifters();
+                            self.bg_next_tile_id =
+                                self.ppu_read(cart, 0x2000 | (self.vram_addr.reg & 0x0fff));
+                        }
+                        2 => {
+                            // Fetch next bg tile attrib
+                            let read_addr = 0x23c0
+                                | (self.vram_addr.nametable_y() << 11)
+                                | (self.vram_addr.nametable_x() << 10)
+                                | ((self.vram_addr.coarse_y() >> 2) << 3)
+                                | (self.vram_addr.coarse_x() >> 2);
+                            self.bg_next_tile_attrib = self.ppu_read(cart, read_addr);
+
+                            if (self.vram_addr.coarse_y() & 0x02) != 0 {
+                                self.bg_next_tile_attrib >>= 4;
+                            }
+                            if (self.vram_addr.coarse_x() & 0x02) != 0 {
+                                self.bg_next_tile_attrib >>= 2;
+                            }
+                            self.bg_next_tile_attrib &= 0x03;
+                        }
+                        4 => {
+                            // Fetch next bg tile LSB bit plane
+                            let read_addr =
+                                ((self.control.get_flag(ControlRegFlag::PatternBg) as u16) << 12)
+                                    + ((self.bg_next_tile_id as u16) << 4)
+                                    + self.vram_addr.fine_y();
+                            self.bg_next_tile_lsb = self.ppu_read(cart, read_addr);
+                        }
+                        6 => {
+                            // Fetch next bg tile MSB bit plane
+                            let read_addr =
+                                ((self.control.get_flag(ControlRegFlag::PatternBg) as u16) << 12)
+                                    + ((self.bg_next_tile_id as u16) << 4)
+                                    + self.vram_addr.fine_y()
+                                    + 8;
+                            self.bg_next_tile_msb = self.ppu_read(cart, read_addr);
+                        }
+                        7 => {
+                            self.increment_scroll_x();
+                        }
+                        _ => {} // do nothing
+                    }
+                }
+
+                if self.cycle == 256 {
+                    self.increment_scroll_y();
+                }
+
+                if self.cycle == 257 {
+                    self.load_bg_shifters();
+                    self.transfer_address_x();
+                }
+
+                if self.cycle == 338 || self.cycle == 340 {
+                    self.bg_next_tile_id =
+                        self.ppu_read(cart, 0x2000 | (self.vram_addr.reg & 0x0fff));
+                }
+
+                if self.scanline == -1 && self.cycle >= 280 && self.cycle < 305 {
+                    self.transfer_address_y();
+                }
+            }
+            240 => {
+                // Post render scanline - do nothing
+            }
+            241..=260 => {
+                if self.scanline == 241 && self.cycle == 1 {
+                    // end of frame, start of vblank period
+                    // if configured, emit CPU NMI
+                    self.status.set_flag(StatusRegFlag::VerticalBlank, true);
+                    if self.control.get_flag(ControlRegFlag::EnableNmi) {
+                        nmi = true;
+                    }
+                }
+            }
+            _ => {
+                unreachable!();
+            }
+        }
+
         if let Some(pos) = visible(self.scanline, self.cycle) {
-            let color = self.rng.rand_usize() & 0x3f;
-            self.set_pixel(frame, pos, color);
+            // let color = self.rng.rand_usize() & 0x3f;
+            // self.set_pixel(frame, pos, color);
+
+            if self.mask.get_flag(MaskRegFlag::RenderBg) {
+                // fine x scrolling
+                let bit_mux = 0x8000 >> self.fine_x;
+
+                // get palette idx
+                let p0_pixel = ((self.bg_shifter_pattern_lo & bit_mux) != 0) as u8;
+                let p1_pixel = ((self.bg_shifter_pattern_hi & bit_mux) != 0) as u8;
+                let bg_palette_idx = (p1_pixel << 1) | p0_pixel;
+
+                // get palette
+                let bg_pal0 = ((self.bg_shifter_attrib_lo & bit_mux) != 0) as u8;
+                let bg_pal1 = ((self.bg_shifter_attrib_hi & bit_mux) != 0) as u8;
+                let bg_palette = (bg_pal1 << 1) | bg_pal0;
+
+                let color = self.get_color_from_palette(cart, bg_palette as usize, bg_palette_idx);
+                self.set_pixel(frame, pos, color);
+            }
         }
 
         self.cycle += 1;
-        if self.cycle > 340 {
+        if self.cycle >= 341 {
             self.cycle = 0;
             self.scanline += 1;
-            if self.scanline == 261 && self.cycle == 0 {
+            if self.scanline >= 261 {
+                self.scanline = -1;
                 self.frame_complete = true;
-            } else if self.scanline > 261 {
-                self.scanline = 0;
+            }
+        }
+
+        nmi
+    }
+
+    fn increment_scroll_x(&mut self) {
+        if self.mask.get_flag(MaskRegFlag::RenderBg)
+            || self.mask.get_flag(MaskRegFlag::RenderSprites)
+        {
+            if self.vram_addr.coarse_x() == 31 {
+                // wrap & switch to other table
+                self.vram_addr.set_coarse_x(0);
+                self.vram_addr.flip_nametable_x();
+            } else {
+                self.vram_addr.set_coarse_x(self.vram_addr.coarse_x() + 1);
             }
         }
     }
 
-    pub fn cpu_read(&mut self, addr: u16) -> u8 {
+    fn increment_scroll_y(&mut self) {
+        if self.mask.get_flag(MaskRegFlag::RenderBg)
+            || self.mask.get_flag(MaskRegFlag::RenderSprites)
+        {
+            if self.vram_addr.fine_y() < 7 {
+                self.vram_addr.set_fine_y(self.vram_addr.fine_y() + 1);
+            } else {
+                self.vram_addr.set_fine_y(0);
+
+                match self.vram_addr.coarse_y() {
+                    29 => {
+                        // wrap & switch to other table
+                        self.vram_addr.set_coarse_y(0);
+                        self.vram_addr.flip_nametable_y();
+                    }
+                    31 => {
+                        // ptr in attribute memory
+                        // wrap without nametable switc
+                        self.vram_addr.set_coarse_y(0);
+                    }
+                    _ => {
+                        self.vram_addr.set_coarse_y(self.vram_addr.coarse_y() + 1);
+                    }
+                }
+            }
+        }
+    }
+
+    fn transfer_address_x(&mut self) {
+        if self.mask.get_flag(MaskRegFlag::RenderBg)
+            || self.mask.get_flag(MaskRegFlag::RenderSprites)
+        {
+            self.vram_addr.set_nametable_x(self.tram_addr.nametable_x());
+            self.vram_addr.set_coarse_x(self.tram_addr.coarse_x());
+        }
+    }
+
+    fn transfer_address_y(&mut self) {
+        if self.mask.get_flag(MaskRegFlag::RenderBg)
+            || self.mask.get_flag(MaskRegFlag::RenderSprites)
+        {
+            self.vram_addr.set_fine_y(self.tram_addr.fine_y());
+            self.vram_addr.set_nametable_y(self.tram_addr.nametable_y());
+            self.vram_addr.set_coarse_y(self.tram_addr.coarse_y());
+        }
+    }
+
+    fn load_bg_shifters(&mut self) {
+        self.bg_shifter_pattern_lo =
+            (self.bg_shifter_pattern_lo & 0xff00) | (self.bg_next_tile_lsb as u16);
+        self.bg_shifter_pattern_hi =
+            (self.bg_shifter_pattern_hi & 0xff00) | (self.bg_next_tile_msb as u16);
+
+        let tmp = if (self.bg_next_tile_attrib & 0b01) != 0 {
+            0xff
+        } else {
+            0x00
+        };
+        self.bg_shifter_attrib_lo = (self.bg_shifter_attrib_lo & 0xff00) | tmp;
+        let tmp = if (self.bg_next_tile_attrib & 0b10) != 0 {
+            0xff
+        } else {
+            0x00
+        };
+        self.bg_shifter_attrib_hi = (self.bg_shifter_attrib_hi & 0xff00) | tmp;
+    }
+
+    fn update_shifters(&mut self) {
+        if self.mask.get_flag(MaskRegFlag::RenderBg) {
+            self.bg_shifter_pattern_lo <<= 1;
+            self.bg_shifter_pattern_hi <<= 1;
+
+            self.bg_shifter_attrib_lo <<= 1;
+            self.bg_shifter_attrib_hi <<= 1;
+        }
+    }
+
+    pub fn cpu_read(&mut self, cart: &mut Cartridge, addr: u16) -> u8 {
+        // Some PPU registers change the internal state (mut)
+        // in response to a read
         match addr {
-            0x0000 => 0x00,
-            0x0001 => 0x00,
-            0x0002 => 0x00,
-            0x0003 => 0x00,
-            0x0004 => 0x00,
-            0x0005 => 0x00,
-            0x0006 => 0x00,
-            0x0007 => 0x00,
+            0x0000 => 0x00, // Control - not readable
+            0x0001 => 0x00, // Mask - not readable
+            0x0002 => {
+                // Status
+
+                // only top 3 bits of the status reg are returned
+                // the other values are undefined, most likely last data buffer values
+                let data = (self.status.reg & 0xe0) | (self.ppu_data_buffer & 0x1f);
+
+                // clear vertical blank flag
+                self.status.set_flag(StatusRegFlag::VerticalBlank, false);
+
+                // reset adress latch flag
+                self.address_latch = false;
+                data
+            }
+            0x0003 => 0x00, // OAM Address
+            0x0004 => 0x00, // OAM Data
+            0x0005 => 0x00, // Scroll - not readable
+            0x0006 => 0x00, // PPU Address - not readable
+            0x0007 => {
+                // PPU Data
+
+                // reads from the name table are delayed one cycle
+                // get last read result from buffer
+                let mut data = self.ppu_data_buffer;
+                // store current read result in buffer
+                self.ppu_data_buffer = self.ppu_read(cart, self.vram_addr.reg);
+
+                // special case: palette memory is returned without cycle delay
+                if self.vram_addr.reg > 0x3f00 {
+                    data = self.ppu_data_buffer;
+                }
+                self.vram_addr.reg += if self.control.get_flag(ControlRegFlag::IncrementMode) {
+                    32
+                } else {
+                    1
+                };
+                data
+            }
             _ => unreachable!(),
         }
     }
 
     pub fn cpu_read_ro(&self, addr: u16) -> u8 {
         match addr {
-            0x0000 => 0x00,
-            0x0001 => 0x00,
-            0x0002 => 0x00,
-            0x0003 => 0x00,
-            0x0004 => 0x00,
-            0x0005 => 0x00,
-            0x0006 => 0x00,
-            0x0007 => 0x00,
+            0x0000 => {
+                // Control
+                self.control.reg
+            }
+            0x0001 => {
+                // Mask
+                self.mask.reg
+            }
+            0x0002 => {
+                // Status
+                self.status.reg
+            }
+            0x0003 => 0x00, // OAM Address
+            0x0004 => 0x00, // OAM Data
+            0x0005 => 0x00, // Scroll
+            0x0006 => 0x00, // PPU Address
+            0x0007 => 0x00, // PPU Data
             _ => unreachable!(),
         }
     }
 
-    pub fn cpu_write(&mut self, addr: u16, data: u8) {
+    pub fn cpu_write(&mut self, cart: &mut Cartridge, addr: u16, data: u8) {
         match addr {
-            0x0000 => {}
-            0x0001 => {}
-            0x0002 => {}
-            0x0003 => {}
-            0x0004 => {}
-            0x0005 => {}
-            0x0006 => {}
-            0x0007 => {}
+            0x0000 => {
+                // Control
+                self.control.reg = data;
+                self.tram_addr
+                    .set_nametable_x(self.control.get_flag(ControlRegFlag::NametableX) as u16);
+                self.tram_addr
+                    .set_nametable_y(self.control.get_flag(ControlRegFlag::NametableY) as u16);
+            }
+            0x0001 => {
+                // Mask
+                self.mask.reg = data;
+            }
+            0x0002 => {
+                // Status
+                // not writable
+            }
+            0x0003 => {
+                // OAM Address
+            }
+            0x0004 => {
+                // OAM Data
+            }
+            0x0005 => {
+                // Scroll
+                if !self.address_latch {
+                    // X offset
+                    self.fine_x = data & 0x07;
+                    self.tram_addr.set_coarse_x((data >> 3) as u16);
+                } else {
+                    // Y offset
+                    self.tram_addr.set_fine_y((data & 0x07) as u16);
+                    self.tram_addr.set_coarse_y((data >> 3) as u16);
+                }
+                self.address_latch = !self.address_latch;
+            }
+            0x0006 => {
+                // PPU Address
+                if !self.address_latch {
+                    // write high byte
+                    self.tram_addr.reg =
+                        (((data & 0x3f) as u16) << 8) | (self.tram_addr.reg & 0x00ff);
+                } else {
+                    // write low byte & update vram address
+                    self.tram_addr.reg = (self.tram_addr.reg & 0xff00) | (data as u16);
+                    self.vram_addr.reg = self.tram_addr.reg;
+                }
+                self.address_latch = !self.address_latch;
+            }
+            0x0007 => {
+                // PPU data
+                self.ppu_write(cart, self.vram_addr.reg, data);
+                self.vram_addr.reg += if self.control.get_flag(ControlRegFlag::IncrementMode) {
+                    32
+                } else {
+                    1
+                };
+            }
             _ => unreachable!(),
         }
     }
@@ -153,7 +522,7 @@ impl Ppu {
         &PALETTE_2C02[color_idx as usize]
     }
 
-    fn set_pixel(&self, frame: &mut [u8], pos: (usize, usize), color_idx: usize) {
+    fn set_pixel(&self, frame: &mut [u8], pos: (usize, usize), color: &PixelRgba) {
         match self.render_params.scaling_factor {
             2 => {
                 let py = self.render_params.offset_y + pos.0 * 2;
@@ -167,7 +536,6 @@ impl Ppu {
                 let off3 = ((py + 1) * self.render_params.width_y + px + 1)
                     * self.render_params.bytes_per_pixel;
 
-                let color = &PALETTE_2C02[color_idx];
                 frame[off0..off0 + self.render_params.bytes_per_pixel].copy_from_slice(color);
                 frame[off1..off1 + self.render_params.bytes_per_pixel].copy_from_slice(color);
                 frame[off2..off2 + self.render_params.bytes_per_pixel].copy_from_slice(color);
@@ -187,7 +555,27 @@ impl Ppu {
                 0x0000..=0x1fff => {
                     self.tbl_pattern[((addr & 0x1000) >> 12) as usize][(addr & 0x0fff) as usize]
                 }
-                0x2000..=0x3eff => 0,
+                0x2000..=0x3eff => {
+                    addr &= 0x0fff;
+
+                    match cart.mirror {
+                        Mirror::Vertical => match addr {
+                            0x0000..=0x03ff | 0x0800..=0x0bff => {
+                                self.tbl_name[0][(addr & 0x03ff) as usize]
+                            }
+                            0x0400..=0x07ff | 0x0c00..=0x0fff => {
+                                self.tbl_name[1][(addr & 0x03ff) as usize]
+                            }
+                            _ => 0x00,
+                        },
+                        Mirror::Horizontal => match addr {
+                            0x0000..=0x07ff => self.tbl_name[0][(addr & 0x03ff) as usize],
+                            0x0800..=0x0fff => self.tbl_name[1][(addr & 0x03ff) as usize],
+                            _ => 0x00,
+                        },
+                        _ => 0,
+                    }
+                }
                 0x3f00..=0x3fff => {
                     addr &= 0x001f;
                     addr = match addr {
@@ -207,10 +595,34 @@ impl Ppu {
         if !cart.ppu_write(addr, data) {
             match addr {
                 0x0000..=0x1fff => {
-                    self.tbl_pattern[((addr >> 0x1000) >> 12) as usize][(addr & 0x0fff) as usize] =
+                    self.tbl_pattern[((addr & 0x1000) >> 12) as usize][(addr & 0x0fff) as usize] =
                         data;
                 }
-                0x2000..=0x3eff => {}
+                0x2000..=0x3eff => {
+                    addr &= 0x0fff;
+
+                    match cart.mirror {
+                        Mirror::Vertical => match addr {
+                            0x0000..=0x03ff | 0x0800..=0x0bff => {
+                                self.tbl_name[0][(addr & 0x03ff) as usize] = data;
+                            }
+                            0x0400..=0x07ff | 0x0c00..=0x0fff => {
+                                self.tbl_name[1][(addr & 0x03ff) as usize] = data;
+                            }
+                            _ => {}
+                        },
+                        Mirror::Horizontal => match addr {
+                            0x0000..=0x07ff => {
+                                self.tbl_name[0][(addr & 0x03ff) as usize] = data;
+                            }
+                            0x0800..=0x0fff => {
+                                self.tbl_name[1][(addr & 0x03ff) as usize] = data;
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                }
                 0x3f00..=0x3fff => {
                     addr &= 0x001f;
                     addr = match addr {
@@ -355,10 +767,112 @@ impl ControlRegFlag {
     }
 }
 
-fn visible(scanline: usize, cycle: usize) -> Option<(usize, usize)> {
-    if scanline < 240 && cycle >= 1 && cycle <= 256 {
-        Some((scanline, cycle - 1))
+struct LoopyReg {
+    reg: u16,
+}
+
+impl LoopyReg {
+    fn coarse_x(&self) -> u16 {
+        self.reg & 0x001f
+    }
+
+    fn set_coarse_x(&mut self, v: u16) {
+        self.reg &= 0xffe0;
+        self.reg |= v & 0x001f;
+    }
+
+    fn coarse_y(&self) -> u16 {
+        (self.reg & 0x03e0) >> 5
+    }
+
+    fn set_coarse_y(&mut self, v: u16) {
+        self.reg &= 0xfc1f;
+        self.reg |= (v << 5) & 0x03e0;
+    }
+
+    fn nametable_x(&self) -> u16 {
+        (self.reg & 0x0400) >> 10
+    }
+
+    fn set_nametable_x(&mut self, v: u16) {
+        self.reg &= 0xfbff;
+        self.reg |= (v << 10) & 0x0400;
+    }
+
+    fn flip_nametable_x(&mut self) {
+        let v = self.nametable_x() != 0;
+        self.set_nametable_x(!v as u16);
+    }
+
+    fn nametable_y(&self) -> u16 {
+        (self.reg & 0x0800) >> 11
+    }
+
+    fn set_nametable_y(&mut self, v: u16) {
+        self.reg &= 0xf7ff;
+        self.reg |= (v << 11) & 0x0800;
+    }
+
+    fn flip_nametable_y(&mut self) {
+        let v = self.nametable_y() != 0;
+        self.set_nametable_y(!v as u16);
+    }
+
+    fn fine_y(&self) -> u16 {
+        (self.reg & 0x7000) >> 12
+    }
+
+    fn set_fine_y(&mut self, v: u16) {
+        self.reg &= 0x8fff;
+        self.reg |= (v << 12) & 0x7000;
+    }
+}
+
+fn visible(scanline: isize, cycle: usize) -> Option<(usize, usize)> {
+    if scanline >= 0 && scanline < 240 && cycle >= 1 && cycle <= 256 {
+        Some((scanline as usize, cycle - 1))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_loopy_reg() {
+        let mut reg = LoopyReg { reg: 0 };
+        for cx in 0..32 {
+            for cy in 0..32 {
+                for ntx in 0..2 {
+                    for nty in 0..2 {
+                        for fy in 0..8 {
+                            reg.set_coarse_x(cx);
+                            reg.set_coarse_y(cy);
+                            reg.set_nametable_x(ntx);
+                            reg.set_nametable_y(nty);
+                            reg.set_fine_y(fy);
+
+                            assert_eq!(reg.coarse_x(), cx);
+                            assert_eq!(reg.coarse_y(), cy);
+                            assert_eq!(reg.nametable_x(), ntx);
+                            assert_eq!(reg.nametable_y(), nty);
+                            assert_eq!(reg.fine_y(), fy);
+
+                            reg.flip_nametable_x();
+                            assert_eq!(reg.nametable_x(), (ntx == 0) as u16);
+                            reg.flip_nametable_x();
+                            assert_eq!(reg.nametable_x(), (ntx != 0) as u16);
+
+                            reg.flip_nametable_y();
+                            assert_eq!(reg.nametable_y(), (nty == 0) as u16);
+                            reg.flip_nametable_y();
+                            assert_eq!(reg.nametable_y(), (nty != 0) as u16);
+                        }
+                    }
+                }
+            }
+        }
     }
 }

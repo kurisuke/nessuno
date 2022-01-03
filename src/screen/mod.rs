@@ -4,7 +4,6 @@ pub mod textwriter;
 use backend::{Frame, ScreenBackend};
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
-use std::iter::Inspect;
 use std::time::Instant;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};

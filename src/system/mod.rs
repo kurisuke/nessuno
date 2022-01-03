@@ -30,10 +30,15 @@ impl System {
     }
 
     pub fn clock(&mut self, frame: &mut [u8]) {
-        self.bus.ppu.clock(frame);
+        let nmi = self.bus.ppu.clock(&mut self.bus.cart, frame);
         if self.clock_counter % 3 == 0 {
             self.cpu.clock(&mut self.bus);
         }
+
+        if nmi {
+            self.cpu.nmi(&mut self.bus);
+        }
+
         self.clock_counter += 1;
     }
 
@@ -71,6 +76,7 @@ impl System {
 
     pub fn reset(&mut self) {
         self.cpu.reset(&mut self.bus);
+        self.bus.ppu.reset();
         self.clock_counter = 0;
     }
 
@@ -112,7 +118,7 @@ impl CpuBus for Bus {
                     self.ram_cpu[(addr & 0x07ff) as usize] = data;
                 }
                 0x2000..=0x3fff => {
-                    self.ppu.cpu_write(addr & 0x0007, data);
+                    self.ppu.cpu_write(&mut self.cart, addr & 0x0007, data);
                 }
                 _ => {}
             }
@@ -126,7 +132,7 @@ impl CpuBus for Bus {
             match addr {
                 // CPU Ram
                 0x0000..=0x1fff => self.ram_cpu[(addr & 0x07ff) as usize],
-                0x2000..=0x3fff => self.ppu.cpu_read(addr & 0x0007),
+                0x2000..=0x3fff => self.ppu.cpu_read(&mut self.cart, addr & 0x0007),
                 _ => 0,
             }
         }
