@@ -468,15 +468,18 @@ impl Cpu {
             &Op::Lsr => {
                 // Logical Shift Right
                 self.fetch(bus, &instr.addr_mode);
-                self.set_flag(Flag::C, self.fetched & 0x01 > 0);
-
-                let tmp = self.fetched >> 1;
-                self.set_flag(Flag::Z, tmp == 0);
-                self.set_flag(Flag::N, tmp != 0);
 
                 if instr.addr_mode == AddrMode::Imp {
+                    self.set_flag(Flag::C, self.a & 0x01 > 0);
+                    let tmp = self.a >> 1;
+                    self.set_flag(Flag::Z, tmp == 0);
+                    self.set_flag(Flag::N, false);
                     self.a = tmp;
                 } else {
+                    self.set_flag(Flag::C, self.fetched & 0x01 > 0);
+                    let tmp = self.fetched >> 1;
+                    self.set_flag(Flag::Z, tmp == 0);
+                    self.set_flag(Flag::N, false);
                     bus.cpu_write(self.addr_abs, tmp);
                 }
                 false
@@ -583,20 +586,18 @@ impl Cpu {
             &Op::Sbc => {
                 // Substract With Carry
                 self.fetch(bus, &instr.addr_mode);
-                let inv = (self.fetched as u16) ^ 0x00ff;
 
-                let tmp = (Wrapping(self.a as u16)
-                    + Wrapping(inv)
-                    + Wrapping(self.get_flag(Flag::C) as u16))
-                .0;
-                self.set_flag(Flag::C, tmp & 0xff00 != 0);
+                let tmp =
+                    u16::from(self.a) + u16::from(!self.fetched) + (self.get_flag(Flag::C) as u16);
+
+                self.set_flag(Flag::C, tmp > 0x00ff);
                 self.set_flag(Flag::Z, tmp & 0x00ff == 0);
-                self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 self.set_flag(
                     Flag::V,
-                    (self.a as u16 ^ inv) & (self.a as u16 ^ tmp) & 0x0080 != 0,
+                    (self.a ^ self.fetched) & (self.a ^ (tmp as u8)) & 0x0080 != 0,
                 );
-                self.a = (tmp & 0x00ff) as u8;
+                self.set_flag(Flag::N, tmp & 0x0080 != 0);
+                self.a = tmp as u8;
                 true
             }
             &Op::Sec => {
