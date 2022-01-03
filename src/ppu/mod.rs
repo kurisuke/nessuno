@@ -1,12 +1,7 @@
 mod palette;
 
-use std::ops::Add;
-
 use crate::cartridge::{Cartridge, Mirror};
-use crate::cpu::Cpu;
 use palette::PALETTE_2C02;
-use tiny_rng::{Rand, Rng};
-use winit::platform::unix::x11::util::StateOperation;
 
 pub struct Ppu {
     render_params: PpuRenderParams,
@@ -47,6 +42,9 @@ pub struct Ppu {
     sprite_count: usize,
     sprite_shifter_pattern_lo: [u8; 8],
     sprite_shifter_pattern_hi: [u8; 8],
+
+    sprite_zero_hit_possible: bool,
+    sprite_zero_rendered: bool,
 }
 
 pub type PatternTable = [[u8; 4 * 128]; 128];
@@ -105,6 +103,9 @@ impl Ppu {
             sprite_count: 0,
             sprite_shifter_pattern_lo: [0x00; 8],
             sprite_shifter_pattern_hi: [0x00; 8],
+
+            sprite_zero_hit_possible: false,
+            sprite_zero_rendered: false,
         }
     }
 
@@ -137,6 +138,8 @@ impl Ppu {
         self.sprite_count = 0;
         self.sprite_shifter_pattern_lo = [0x00; 8];
         self.sprite_shifter_pattern_hi = [0x00; 8];
+        self.sprite_zero_hit_possible = false;
+        self.sprite_zero_rendered = false;
     }
 
     pub fn clock(&mut self, cart: &mut Cartridge, frame: &mut [u8]) -> bool {
@@ -152,6 +155,7 @@ impl Ppu {
                 if self.scanline == -1 && self.cycle == 1 {
                     // start of new cycle, clear flags
                     self.status.set_flag(StatusRegFlag::VerticalBlank, false);
+                    self.status.set_flag(StatusRegFlag::SpriteZeroHit, false);
                     self.status.set_flag(StatusRegFlag::SpriteOverflow, false);
 
                     for i in 0..8 {
@@ -242,10 +246,14 @@ impl Ppu {
                     } else {
                         8
                     };
-                    for oam_entry in self.oam.iter() {
+                    self.sprite_zero_hit_possible = false;
+                    for (i, oam_entry) in self.oam.iter().enumerate() {
                         let diff = self.scanline - oam_entry.y() as isize;
                         if diff >= 0 && diff < sprite_size {
                             if self.sprite_count < 8 {
+                                if i == 0 {
+                                    self.sprite_zero_hit_possible = true;
+                                }
                                 self.sprite_scanline[self.sprite_count] = *oam_entry;
                                 self.sprite_count += 1
                             }
@@ -375,6 +383,8 @@ impl Ppu {
                 .mask
                 .get_flag(MaskRegFlag::RenderSprites)
             {
+                self.sprite_zero_rendered = false;
+
                 let mut fg_palette = 0x00;
                 let mut fg_palette_idx = 0x00;
                 let mut fg_priority = false;
@@ -393,6 +403,9 @@ impl Ppu {
                         fg_priority = (s.attrib() & 0x20) == 0;
 
                         if fg_palette_idx != 0 {
+                            if i == 0 {
+                                self.sprite_zero_rendered = true;
+                            }
                             break;
                         }
                     }
@@ -412,6 +425,25 @@ impl Ppu {
                 // bg visible, fg transparent -> bg wins
                 (bg_palette, bg_palette_idx)
             } else if bg_palette_idx > 0 && fg_palette_idx > 0 {
+                // sprite zero hit detection
+                if self.sprite_zero_hit_possible
+                    && self.sprite_zero_rendered
+                    && self.mask.get_flag(MaskRegFlag::RenderBg)
+                    && self.mask.get_flag(MaskRegFlag::RenderSprites)
+                {
+                    if !(self.mask.get_flag(MaskRegFlag::RenderBgLeft)
+                        || self.mask.get_flag(MaskRegFlag::RenderSpritesLeft))
+                    {
+                        if self.cycle >= 9 && self.cycle < 258 {
+                            self.status.set_flag(StatusRegFlag::SpriteZeroHit, true);
+                        }
+                    } else {
+                        if self.cycle >= 1 && self.cycle < 258 {
+                            self.status.set_flag(StatusRegFlag::SpriteZeroHit, true);
+                        }
+                    }
+                }
+
                 // both visible -> eval fg priority flag
                 if fg_priority {
                     (fg_palette, fg_palette_idx)
