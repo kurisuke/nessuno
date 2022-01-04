@@ -812,7 +812,7 @@ impl Ppu {
                 0x2000..=0x3eff => {
                     addr &= 0x0fff;
 
-                    match cart.mirror {
+                    match cart.mirror() {
                         Mirror::Vertical => match addr {
                             0x0000..=0x03ff | 0x0800..=0x0bff => {
                                 self.tbl_name[0][(addr & 0x03ff) as usize]
@@ -855,7 +855,7 @@ impl Ppu {
                 0x2000..=0x3eff => {
                     addr &= 0x0fff;
 
-                    match cart.mirror {
+                    match cart.mirror() {
                         Mirror::Vertical => match addr {
                             0x0000..=0x03ff | 0x0800..=0x0bff => {
                                 self.tbl_name[0][(addr & 0x03ff) as usize] = data;

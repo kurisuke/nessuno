@@ -121,6 +121,7 @@ impl System {
     }
 
     pub fn reset(&mut self) {
+        self.bus.cart.reset();
         self.cpu.reset(&mut self.bus);
         self.bus.ppu.reset();
         self.clock_counter = 0;

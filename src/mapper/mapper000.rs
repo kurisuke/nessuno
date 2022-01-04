@@ -1,5 +1,7 @@
 use super::Mapper;
 
+use crate::cartridge::Mirror;
+
 pub struct Mapper000 {
     num_banks_prg: u8,
     num_banks_chr: u8,
@@ -52,6 +54,7 @@ impl Mapper for Mapper000 {
         match addr {
             0x0000..=0x1fff => {
                 if self.num_banks_chr == 0 {
+                    // treat as RAM
                     Some(addr as usize)
                 } else {
                     None
@@ -60,4 +63,10 @@ impl Mapper for Mapper000 {
             _ => None,
         }
     }
+
+    fn mirror(&self) -> Mirror {
+        Mirror::Hardware
+    }
+
+    fn reset(&mut self) {}
 }

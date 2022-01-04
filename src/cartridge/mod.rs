@@ -5,10 +5,10 @@ use std::io::Read;
 use std::mem;
 
 pub struct Cartridge {
-    pub mirror: Mirror,
-
     mem_prg: Vec<u8>,
     mem_chr: Vec<u8>,
+
+    hw_mirror: Mirror,
 
     mapper_id: u8,
     num_banks_prg: u8,
@@ -17,7 +17,9 @@ pub struct Cartridge {
     mapper: Box<dyn Mapper>,
 }
 
+#[derive(Copy, Clone)]
 pub enum Mirror {
+    Hardware,
     Vertical,
     Horizontal,
     OneScreenLo,
@@ -67,7 +69,7 @@ impl Cartridge {
             let _junk = reader.seek_relative(512)?;
         }
         let mapper_id = ((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4);
-        let mirror = if header.mapper1 & 0x01 != 0 {
+        let hw_mirror = if header.mapper1 & 0x01 != 0 {
             Mirror::Vertical
         } else {
             Mirror::Horizontal
@@ -96,7 +98,7 @@ impl Cartridge {
                     mem_prg,
                     mem_chr,
                     mapper_id,
-                    mirror,
+                    hw_mirror,
                     num_banks_prg,
                     num_banks_chr,
                     mapper,
@@ -145,5 +147,17 @@ impl Cartridge {
         } else {
             false
         }
+    }
+
+    pub fn mirror(&self) -> Mirror {
+        let m = self.mapper.mirror();
+        match m {
+            Mirror::Hardware => self.hw_mirror,
+            _ => m,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.mapper.reset();
     }
 }
