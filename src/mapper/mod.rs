@@ -23,7 +23,18 @@ pub trait Mapper {
 
     fn ppu_map_write(&mut self, addr: u16, data: u8) -> MapResult;
 
-    fn mirror(&self) -> Mirror;
+    fn mirror(&self) -> Mirror {
+        Mirror::Hardware
+    }
 
-    fn reset(&mut self);
+    fn reset(&mut self) {}
+
+    // Scanline IRQ interface
+    fn irq_state(&self) -> bool {
+        false
+    }
+
+    fn irq_clear(&mut self) {}
+
+    fn on_scanline_end(&mut self) {}
 }

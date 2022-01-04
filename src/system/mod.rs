@@ -79,6 +79,11 @@ impl System {
             self.cpu.nmi(&mut self.bus);
         }
 
+        if self.bus.cart.irq_state() {
+            self.bus.cart.irq_clear();
+            self.cpu.irq(&mut self.bus);
+        }
+
         self.clock_counter += 1;
     }
 

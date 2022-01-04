@@ -71,10 +71,4 @@ impl Mapper for Mapper000 {
             MapResult::None
         }
     }
-
-    fn mirror(&self) -> Mirror {
-        Mirror::Hardware
-    }
-
-    fn reset(&mut self) {}
 }

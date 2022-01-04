@@ -1,6 +1,9 @@
 mod palette;
 
-use crate::cartridge::{Cartridge, Mirror};
+use crate::{
+    cartridge::{Cartridge, Mirror},
+    mapper::Mapper,
+};
 use palette::PALETTE_2C02;
 
 pub struct Ppu {
@@ -338,6 +341,13 @@ impl Ppu {
                         self.sprite_shifter_pattern_lo[i] = sprite_pattern_bits_lo;
                         self.sprite_shifter_pattern_hi[i] = sprite_pattern_bits_hi;
                     }
+                }
+
+                if self.cycle == 260
+                    && (self.mask.get_flag(MaskRegFlag::RenderBg)
+                        || self.mask.get_flag(MaskRegFlag::RenderSprites))
+                {
+                    cart.on_scanline_end();
                 }
             }
             240 => {

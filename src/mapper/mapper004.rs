@@ -14,6 +14,12 @@ pub struct Mapper004 {
     target_reg_idx: usize,
     prg_bank_mode: bool,
     chr_inversion: bool,
+
+    irq_active: bool,
+    irq_enable: bool,
+    irq_update: bool,
+    irq_counter: usize,
+    irq_reload: usize,
 }
 
 impl Mapper004 {
@@ -35,6 +41,12 @@ impl Mapper004 {
             target_reg_idx: 0,
             prg_bank_mode: false,
             chr_inversion: false,
+
+            irq_active: false,
+            irq_enable: false,
+            irq_update: false,
+            irq_counter: 0,
+            irq_reload: 0,
         }
     }
 }
@@ -119,11 +131,24 @@ impl Mapper for Mapper004 {
                 MapResult::DirectWrite
             }
             0xc000..=0xdfff => {
-                // IRQ Latch / Configure, TODO
+                if addr & 0x0001 == 0 {
+                    // IRQ Configure
+                    self.irq_reload = data as usize;
+                } else {
+                    // IRQ Latch
+                    self.irq_counter = 0x0000;
+                }
                 MapResult::DirectWrite
             }
             0xe000..=0xffff => {
-                // IRQ Enable / Disable, TODO
+                if addr & 0x0001 == 0 {
+                    // IRQ Disable
+                    self.irq_enable = false;
+                    self.irq_active = false;
+                } else {
+                    // IRQ Enable
+                    self.irq_enable = true;
+                }
                 MapResult::DirectWrite
             }
             _ => MapResult::None,
@@ -163,5 +188,36 @@ impl Mapper for Mapper004 {
         ];
         self.chr_bank_offset = [0; 8];
         self.target_reg_idx = 0;
+
+        self.irq_active = false;
+        self.irq_enable = false;
+        self.irq_update = false;
+        self.irq_counter = 0;
+        self.irq_reload = 0;
+    }
+
+    fn irq_state(&self) -> bool {
+        self.irq_active
+    }
+
+    fn irq_clear(&mut self) {
+        self.irq_active = false;
+    }
+
+    fn on_scanline_end(&mut self) {
+        match self.irq_counter {
+            0 => {
+                self.irq_counter = self.irq_reload;
+            }
+            1 => {
+                if self.irq_enable {
+                    self.irq_active = true;
+                }
+                self.irq_counter -= 1;
+            }
+            _ => {
+                self.irq_counter -= 1;
+            }
+        }
     }
 }

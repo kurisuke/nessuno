@@ -73,10 +73,6 @@ impl Mapper for Mapper002 {
         }
     }
 
-    fn mirror(&self) -> Mirror {
-        Mirror::Hardware
-    }
-
     fn reset(&mut self) {
         self.prg_bank_select_lo = 0;
         self.prg_bank_select_hi = self.num_banks_prg - 1;
