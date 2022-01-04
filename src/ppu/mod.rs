@@ -313,11 +313,11 @@ impl Ppu {
                                     if scanline_diff < 8 {
                                         // top half tile
                                         (((s.id() & 0x01) as u16) << 12)
-                                            | (((s.id() & 0xfe) as u16) << 4)
+                                            | (((s.id() & 0xfe) as u16 + 1) << 4)
                                             | ((7 - scanline_diff) & 0x07) as u16
                                     } else {
                                         (((s.id() & 0x01) as u16) << 12)
-                                            | (((s.id() & 0xfe) as u16 + 1) << 4)
+                                            | (((s.id() & 0xfe) as u16) << 4)
                                             | ((7 - scanline_diff) & 0x07) as u16
                                     }
                                 }
