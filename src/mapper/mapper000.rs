@@ -1,14 +1,14 @@
-use super::Mapper;
+use super::{MapResult, Mapper};
 
 use crate::cartridge::Mirror;
 
 pub struct Mapper000 {
-    num_banks_prg: u8,
-    num_banks_chr: u8,
+    num_banks_prg: usize,
+    num_banks_chr: usize,
 }
 
 impl Mapper000 {
-    pub fn new(num_banks_prg: u8, num_banks_chr: u8) -> Mapper000 {
+    pub fn new(num_banks_prg: usize, num_banks_chr: usize) -> Mapper000 {
         Mapper000 {
             num_banks_prg,
             num_banks_chr,
@@ -17,50 +17,58 @@ impl Mapper000 {
 }
 
 impl Mapper for Mapper000 {
-    fn cpu_map_read(&self, addr: u16) -> Option<usize> {
+    fn cpu_map_read(&mut self, addr: u16) -> MapResult {
         match addr {
             0x8000..=0xffff => {
                 if self.num_banks_prg > 1 {
-                    Some((addr & 0x7fff) as usize)
+                    MapResult::MapAddr((addr & 0x7fff) as usize)
                 } else {
-                    Some((addr & 0x3fff) as usize)
+                    MapResult::MapAddr((addr & 0x3fff) as usize)
                 }
             }
-            _ => None,
+            _ => MapResult::None,
         }
     }
 
-    fn cpu_map_write(&mut self, addr: u16) -> Option<usize> {
+    fn cpu_map_read_ro(&self, addr: u16) -> MapResult {
         match addr {
             0x8000..=0xffff => {
                 if self.num_banks_prg > 1 {
-                    Some((addr & 0x7fff) as usize)
+                    MapResult::MapAddr((addr & 0x7fff) as usize)
                 } else {
-                    Some((addr & 0x3fff) as usize)
+                    MapResult::MapAddr((addr & 0x3fff) as usize)
                 }
             }
-            _ => None,
+            _ => MapResult::None,
         }
     }
 
-    fn ppu_map_read(&self, addr: u16) -> Option<usize> {
+    fn cpu_map_write(&mut self, addr: u16, data: u8) -> MapResult {
         match addr {
-            0x0000..=0x1fff => Some(addr as usize),
-            _ => None,
+            0x8000..=0xffff => {
+                if self.num_banks_prg > 1 {
+                    MapResult::MapAddr((addr & 0x7fff) as usize)
+                } else {
+                    MapResult::MapAddr((addr & 0x3fff) as usize)
+                }
+            }
+            _ => MapResult::None,
         }
     }
 
-    fn ppu_map_write(&mut self, addr: u16) -> Option<usize> {
+    fn ppu_map_read(&mut self, addr: u16) -> MapResult {
         match addr {
-            0x0000..=0x1fff => {
-                if self.num_banks_chr == 0 {
-                    // treat as RAM
-                    Some(addr as usize)
-                } else {
-                    None
-                }
-            }
-            _ => None,
+            0x0000..=0x1fff => MapResult::MapAddr(addr as usize),
+            _ => MapResult::None,
+        }
+    }
+
+    fn ppu_map_write(&mut self, addr: u16, _data: u8) -> MapResult {
+        if addr < 0x2000 && self.num_banks_chr == 0 {
+            // treat as RAM
+            MapResult::MapAddr(addr as usize)
+        } else {
+            MapResult::None
         }
     }
 

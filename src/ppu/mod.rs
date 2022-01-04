@@ -827,7 +827,9 @@ impl Ppu {
                             0x0800..=0x0fff => self.tbl_name[1][(addr & 0x03ff) as usize],
                             _ => 0x00,
                         },
-                        _ => 0,
+                        Mirror::OneScreenLo => self.tbl_name[0][(addr & 0x03ff) as usize],
+                        Mirror::OneScreenHi => self.tbl_name[1][(addr & 0x03ff) as usize],
+                        _ => 0x00,
                     }
                 }
                 0x3f00..=0x3fff => {
@@ -874,6 +876,12 @@ impl Ppu {
                             }
                             _ => {}
                         },
+                        Mirror::OneScreenLo => {
+                            self.tbl_name[0][(addr & 0x03ff) as usize] = data;
+                        }
+                        Mirror::OneScreenHi => {
+                            self.tbl_name[1][(addr & 0x03ff) as usize] = data;
+                        }
                         _ => {}
                     }
                 }

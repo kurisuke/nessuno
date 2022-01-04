@@ -1,4 +1,6 @@
-use crate::mapper::{mapper000::Mapper000, Mapper};
+use crate::mapper::{
+    mapper000::Mapper000, mapper001::Mapper001, mapper002::Mapper002, MapResult, Mapper,
+};
 use std::fs::File;
 use std::io;
 use std::io::Read;
@@ -11,13 +13,13 @@ pub struct Cartridge {
     hw_mirror: Mirror,
 
     mapper_id: u8,
-    num_banks_prg: u8,
-    num_banks_chr: u8,
+    num_banks_prg: usize,
+    num_banks_chr: usize,
 
     mapper: Box<dyn Mapper>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Mirror {
     Hardware,
     Vertical,
@@ -75,8 +77,13 @@ impl Cartridge {
             Mirror::Horizontal
         };
 
-        let mapper = match mapper_id {
-            0 => Box::new(Mapper000::new(header.prg_rom_chunks, header.chr_rom_chunks)),
+        let num_banks_prg = header.prg_rom_chunks as usize;
+        let num_banks_chr = header.chr_rom_chunks as usize;
+
+        let mapper: Box<dyn Mapper> = match mapper_id {
+            0 => Box::new(Mapper000::new(num_banks_prg, num_banks_chr)),
+            1 => Box::new(Mapper001::new(num_banks_prg, num_banks_chr)),
+            2 => Box::new(Mapper002::new(num_banks_prg, num_banks_chr)),
             _ => panic!("Unsupported mapper: {:03}", mapper_id),
         };
 
@@ -86,13 +93,17 @@ impl Cartridge {
                 unreachable!()
             }
             1 => {
-                let num_banks_prg = header.prg_rom_chunks;
                 let mut mem_prg = vec![0; num_banks_prg as usize * 16384];
                 reader.read_exact(&mut mem_prg)?;
 
-                let num_banks_chr = header.chr_rom_chunks;
-                let mut mem_chr = vec![0; num_banks_chr as usize * 8192];
-                reader.read_exact(&mut mem_chr)?;
+                let mem_chr = match num_banks_chr {
+                    0 => vec![0; 8192],
+                    _ => {
+                        let mut m = vec![0; num_banks_chr as usize * 8192];
+                        reader.read_exact(&mut m)?;
+                        m
+                    }
+                };
 
                 Ok(Cartridge {
                     mem_prg,
@@ -114,38 +125,48 @@ impl Cartridge {
     }
 
     pub fn cpu_read(&mut self, addr: u16) -> Option<u8> {
-        self.mapper
-            .cpu_map_read(addr)
-            .map(|mapped_addr| self.mem_prg[mapped_addr])
+        match self.mapper.cpu_map_read(addr) {
+            MapResult::MapAddr(mapped_addr) => Some(self.mem_prg[mapped_addr]),
+            MapResult::DirectRead(v) => Some(v),
+            _ => None,
+        }
     }
 
     pub fn cpu_read_ro(&self, addr: u16) -> Option<u8> {
-        self.mapper
-            .cpu_map_read(addr)
-            .map(|mapped_addr| self.mem_prg[mapped_addr])
+        match self.mapper.cpu_map_read_ro(addr) {
+            MapResult::MapAddr(mapped_addr) => Some(self.mem_prg[mapped_addr]),
+            MapResult::DirectRead(v) => Some(v),
+            _ => None,
+        }
     }
 
     pub fn cpu_write(&mut self, addr: u16, data: u8) -> bool {
-        if let Some(mapped_addr) = self.mapper.cpu_map_write(addr) {
-            self.mem_prg[mapped_addr] = data;
-            true
-        } else {
-            false
+        match self.mapper.cpu_map_write(addr, data) {
+            MapResult::MapAddr(mapped_addr) => {
+                self.mem_prg[mapped_addr] = data;
+                true
+            }
+            MapResult::DirectWrite => true,
+            _ => false,
         }
     }
 
     pub fn ppu_read(&mut self, addr: u16) -> Option<u8> {
-        self.mapper
-            .ppu_map_read(addr)
-            .map(|mapped_addr| self.mem_chr[mapped_addr])
+        match self.mapper.ppu_map_read(addr) {
+            MapResult::MapAddr(mapped_addr) => Some(self.mem_chr[mapped_addr]),
+            MapResult::DirectRead(v) => Some(v),
+            _ => None,
+        }
     }
 
     pub fn ppu_write(&mut self, addr: u16, data: u8) -> bool {
-        if let Some(mapped_addr) = self.mapper.ppu_map_write(addr) {
-            self.mem_chr[mapped_addr] = data;
-            true
-        } else {
-            false
+        match self.mapper.ppu_map_write(addr, data) {
+            MapResult::MapAddr(mapped_addr) => {
+                self.mem_chr[mapped_addr] = data;
+                true
+            }
+            MapResult::DirectWrite => true,
+            _ => false,
         }
     }
 
