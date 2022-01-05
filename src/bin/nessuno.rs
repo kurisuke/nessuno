@@ -289,7 +289,7 @@ impl Nessuno {
     }
 
     fn new(cart: Cartridge) -> Nessuno {
-        let mut system = System::new(cart);
+        let mut system = System::new(cart, 48000);
         let disasm = system.cpu_disassemble(0x0000, 0xffff);
 
         Nessuno {

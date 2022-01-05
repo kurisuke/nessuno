@@ -4,11 +4,15 @@ use crate::controller::{Controller, ControllerInput};
 use crate::cpu::{Cpu, Disassembly};
 use crate::ppu::{PatternTable, Ppu, SetPixel};
 
+const TIME_PER_CLOCK: f64 = 1f64 / 5369318f64; // PPU Clock freq
+
 pub struct System {
     pub cpu: Cpu,
     bus: Bus,
 
     clock_counter: usize,
+    time_per_sample: f64,
+    time_audio: f64,
 }
 
 struct Bus {
@@ -28,10 +32,11 @@ pub struct SystemClockResult {
     pub set_pixel: Option<SetPixel>,
     pub frame_complete: bool,
     pub cpu_complete: bool,
+    pub audio_sample: Option<f32>,
 }
 
 impl System {
-    pub fn new(cart: Cartridge) -> System {
+    pub fn new(cart: Cartridge, sample_rate: u32) -> System {
         System {
             cpu: Cpu::new(),
             bus: Bus {
@@ -47,6 +52,8 @@ impl System {
                 dma_dummy: true,
             },
             clock_counter: 0,
+            time_per_sample: 1f64 / (sample_rate as f64),
+            time_audio: 0f64,
         }
     }
 
@@ -55,6 +62,7 @@ impl System {
             set_pixel: None,
             frame_complete: false,
             cpu_complete: false,
+            audio_sample: None,
         };
 
         let ppu_res = self.bus.ppu.clock(&mut self.bus.cart);
@@ -88,6 +96,13 @@ impl System {
             } else {
                 self.cpu.clock(&mut self.bus);
             }
+        }
+
+        // audio sync
+        self.time_audio += TIME_PER_CLOCK;
+        if self.time_audio >= self.time_per_sample {
+            self.time_audio -= self.time_per_sample;
+            res.audio_sample = Some(0f32);
         }
 
         if ppu_res.nmi {
