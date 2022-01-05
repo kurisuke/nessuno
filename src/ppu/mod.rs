@@ -1,19 +1,11 @@
-mod palette;
+pub mod palette;
 
-use crate::{
-    cartridge::{Cartridge, Mirror},
-    mapper::Mapper,
-};
-use palette::PALETTE_2C02;
+use crate::cartridge::{Cartridge, Mirror};
 
 pub struct Ppu {
-    render_params: PpuRenderParams,
-
     tbl_pattern: [[u8; 4 * 1024]; 2],
     tbl_name: [[u8; 1024]; 2],
     tbl_palette: [u8; 32],
-
-    pub frame_complete: bool,
 
     scanline: isize,
     cycle: usize,
@@ -50,27 +42,25 @@ pub struct Ppu {
     sprite_zero_rendered: bool,
 }
 
-pub type PatternTable = [[u8; 4 * 128]; 128];
-pub type PixelRgba = [u8; 4];
-
-pub struct PpuRenderParams {
-    pub offset_x: usize,
-    pub offset_y: usize,
-    pub width_y: usize,
-    pub scaling_factor: usize,
-    pub bytes_per_pixel: usize,
+pub struct PpuClockResult {
+    pub nmi: bool,
+    pub set_pixel: Option<SetPixel>,
+    pub frame_complete: bool,
 }
 
-impl Ppu {
-    pub fn new(render_params: PpuRenderParams) -> Ppu {
-        Ppu {
-            render_params,
+pub struct SetPixel {
+    pub pos: (usize, usize),
+    pub color: usize,
+}
 
+pub type PatternTable = [[usize; 128]; 128];
+
+impl Ppu {
+    pub fn new() -> Ppu {
+        Ppu {
             tbl_pattern: [[0; 4 * 1024]; 2],
             tbl_name: [[0; 1024]; 2],
             tbl_palette: [0; 32],
-
-            frame_complete: false,
 
             cycle: 0,
             scanline: 0,
@@ -145,8 +135,12 @@ impl Ppu {
         self.sprite_zero_rendered = false;
     }
 
-    pub fn clock(&mut self, cart: &mut Cartridge, frame: &mut [u8]) -> bool {
-        let mut nmi = false;
+    pub fn clock(&mut self, cart: &mut Cartridge) -> PpuClockResult {
+        let mut res = PpuClockResult {
+            nmi: false,
+            set_pixel: None,
+            frame_complete: false,
+        };
 
         match self.scanline {
             -1..=239 => {
@@ -359,7 +353,7 @@ impl Ppu {
                     // if configured, emit CPU NMI
                     self.status.set_flag(StatusRegFlag::VerticalBlank, true);
                     if self.control.get_flag(ControlRegFlag::EnableNmi) {
-                        nmi = true;
+                        res.nmi = true;
                     }
                 }
             }
@@ -465,7 +459,7 @@ impl Ppu {
             };
 
             let color = self.get_color_from_palette(cart, palette as usize, palette_idx);
-            self.set_pixel(frame, pos, color);
+            res.set_pixel = Some(SetPixel { pos, color });
         }
 
         self.cycle += 1;
@@ -474,11 +468,11 @@ impl Ppu {
             self.scanline += 1;
             if self.scanline >= 261 {
                 self.scanline = -1;
-                self.frame_complete = true;
+                res.frame_complete = true;
             }
         }
 
-        nmi
+        res
     }
 
     fn increment_scroll_x(&mut self) {
@@ -747,7 +741,7 @@ impl Ppu {
         table_idx: usize,
         palette: usize,
     ) -> PatternTable {
-        let mut table = [[0; 4 * 128]; 128];
+        let mut table = [[0; 128]; 128];
         for tile_y in 0..16 {
             for tile_x in 0..16 {
                 let offset = tile_y * 256 + tile_x * 16;
@@ -763,11 +757,10 @@ impl Ppu {
                         tile_lsb >>= 1;
                         tile_msb >>= 1;
 
-                        let pos_x = (tile_x * 8 + (7 - col)) * 4;
+                        let pos_x = tile_x * 8 + (7 - col);
                         let pos_y = tile_y * 8 + row;
-                        table[pos_y][pos_x..pos_x + 4].copy_from_slice(
-                            self.get_color_from_palette(cart, palette, pixel_value),
-                        );
+                        table[pos_y][pos_x] =
+                            self.get_color_from_palette(cart, palette, pixel_value);
                     }
                 }
             }
@@ -780,33 +773,10 @@ impl Ppu {
         cart: &mut Cartridge,
         palette: usize,
         pixel_value: u8,
-    ) -> &PixelRgba {
+    ) -> usize {
         let offset = 0x3f00 + ((palette as u16) << 2) + pixel_value as u16;
         let color_idx = self.ppu_read(cart, offset);
-        &PALETTE_2C02[color_idx as usize]
-    }
-
-    fn set_pixel(&self, frame: &mut [u8], pos: (usize, usize), color: &PixelRgba) {
-        match self.render_params.scaling_factor {
-            2 => {
-                let py = self.render_params.offset_y + pos.0 * 2;
-                let px = self.render_params.offset_x + pos.1 * 2;
-                let off0 =
-                    (py * self.render_params.width_y + px) * self.render_params.bytes_per_pixel;
-                let off1 =
-                    (py * self.render_params.width_y + px + 1) * self.render_params.bytes_per_pixel;
-                let off2 = ((py + 1) * self.render_params.width_y + px)
-                    * self.render_params.bytes_per_pixel;
-                let off3 = ((py + 1) * self.render_params.width_y + px + 1)
-                    * self.render_params.bytes_per_pixel;
-
-                frame[off0..off0 + self.render_params.bytes_per_pixel].copy_from_slice(color);
-                frame[off1..off1 + self.render_params.bytes_per_pixel].copy_from_slice(color);
-                frame[off2..off2 + self.render_params.bytes_per_pixel].copy_from_slice(color);
-                frame[off3..off3 + self.render_params.bytes_per_pixel].copy_from_slice(color);
-            }
-            _ => unreachable!(),
-        }
+        color_idx as usize
     }
 
     fn ppu_read(&self, cart: &mut Cartridge, mut addr: u16) -> u8 {

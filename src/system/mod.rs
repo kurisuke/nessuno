@@ -2,7 +2,7 @@ use crate::bus::CpuBus;
 use crate::cartridge::Cartridge;
 use crate::controller::{Controller, ControllerInput};
 use crate::cpu::{Cpu, Disassembly};
-use crate::ppu::{PatternTable, PixelRgba, Ppu, PpuRenderParams};
+use crate::ppu::{PatternTable, Ppu, SetPixel};
 
 pub struct System {
     pub cpu: Cpu,
@@ -24,13 +24,19 @@ struct Bus {
     dma_dummy: bool,
 }
 
+pub struct SystemClockResult {
+    pub set_pixel: Option<SetPixel>,
+    pub frame_complete: bool,
+    pub cpu_complete: bool,
+}
+
 impl System {
-    pub fn new(cart: Cartridge, render_params: PpuRenderParams) -> System {
+    pub fn new(cart: Cartridge) -> System {
         System {
             cpu: Cpu::new(),
             bus: Bus {
                 ram_cpu: [0; 2 * 1024],
-                ppu: Ppu::new(render_params),
+                ppu: Ppu::new(),
                 cart,
                 controller: [Controller::new(), Controller::new()],
 
@@ -44,8 +50,17 @@ impl System {
         }
     }
 
-    pub fn clock(&mut self, frame: &mut [u8]) {
-        let nmi = self.bus.ppu.clock(&mut self.bus.cart, frame);
+    pub fn clock(&mut self) -> SystemClockResult {
+        let mut res = SystemClockResult {
+            set_pixel: None,
+            frame_complete: false,
+            cpu_complete: false,
+        };
+
+        let ppu_res = self.bus.ppu.clock(&mut self.bus.cart);
+        res.set_pixel = ppu_res.set_pixel;
+        res.frame_complete = ppu_res.frame_complete;
+
         if self.clock_counter % 3 == 0 {
             if self.bus.dma_transfer {
                 if self.bus.dma_dummy {
@@ -75,7 +90,7 @@ impl System {
             }
         }
 
-        if nmi {
+        if ppu_res.nmi {
             self.cpu.nmi(&mut self.bus);
         }
 
@@ -84,44 +99,42 @@ impl System {
             self.cpu.irq(&mut self.bus);
         }
 
+        res.cpu_complete = self.cpu.complete();
         self.clock_counter += 1;
+
+        res
     }
 
-    pub fn frame(&mut self, frame: &mut [u8], wait_cpu_complete: bool) {
-        loop {
-            self.clock(frame);
-            if self.bus.ppu.frame_complete {
-                break;
+    pub fn frame(&mut self, wait_cpu_complete: bool) {
+        let mut cpu_complete = loop {
+            let clock_res = self.clock();
+            if clock_res.frame_complete {
+                break clock_res.cpu_complete;
             }
-        }
+        };
 
         if wait_cpu_complete {
-            while !self.cpu.complete() {
-                self.clock(frame);
+            while !cpu_complete {
+                cpu_complete = self.clock().cpu_complete;
             }
         }
-
-        self.bus.ppu.frame_complete = false;
     }
 
-    pub fn step(&mut self, frame: &mut [u8]) {
+    pub fn step(&mut self) {
         // Run cycles until the current CPU instruction has executed
         loop {
-            self.clock(frame);
-            if self.cpu.complete() {
+            let clock_res = self.clock();
+            if clock_res.cpu_complete {
                 break;
             }
         }
 
         // Run additional system clock cycles (e.g. PPU) until the next CPU instruction starts
-        while self.cpu.complete() {
-            self.clock(frame);
-        }
-    }
-
-    pub fn step_count(&mut self, frame: &mut [u8], count: usize) {
-        for _ in 0..count {
-            self.step(frame);
+        loop {
+            let clock_res = self.clock();
+            if !clock_res.cpu_complete {
+                break;
+            }
         }
     }
 
@@ -154,7 +167,7 @@ impl System {
             .get_pattern_table(&mut self.bus.cart, table_idx, palette)
     }
 
-    pub fn ppu_get_color_from_palette(&mut self, palette: usize, pixel_value: u8) -> &PixelRgba {
+    pub fn ppu_get_color_from_palette(&mut self, palette: usize, pixel_value: u8) -> usize {
         self.bus
             .ppu
             .get_color_from_palette(&mut self.bus.cart, palette, pixel_value)

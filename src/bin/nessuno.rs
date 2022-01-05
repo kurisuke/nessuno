@@ -1,7 +1,8 @@
 use nessuno::cartridge::Cartridge;
 use nessuno::controller::ControllerInput;
 use nessuno::cpu::{Disassembly, Flag};
-use nessuno::ppu::{PixelRgba, PpuRenderParams};
+use nessuno::ppu::palette::PALETTE_2C02;
+use nessuno::ppu::SetPixel;
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
@@ -26,6 +27,7 @@ struct Nessuno {
     system: System,
     disasm: Disassembly,
     text_writer: TextWriter,
+    render_params: VideoRenderParams,
 
     run: bool,
     t_residual: f64,
@@ -33,6 +35,14 @@ struct Nessuno {
     display_oam: bool,
     palette_selected: usize,
     paint: bool,
+}
+
+struct VideoRenderParams {
+    offset_x: usize,
+    offset_y: usize,
+    width_y: usize,
+    scaling_factor: usize,
+    bytes_per_pixel: usize,
 }
 
 enum UserAction {
@@ -208,7 +218,7 @@ impl Nessuno {
                     354,
                     8,
                     8,
-                    &color,
+                    &PALETTE_2C02[color],
                 );
             }
         }
@@ -221,7 +231,7 @@ impl Nessuno {
         pos_y: usize,
         size_x: usize,
         size_y: usize,
-        color: &PixelRgba,
+        color: &[u8; 4],
     ) {
         for y in pos_y..(pos_y + size_y) {
             for x in pos_x..(pos_x + size_x) {
@@ -242,8 +252,115 @@ impl Nessuno {
             .system
             .ppu_get_pattern_table(table_idx, self.palette_selected);
         for (offset_y, line) in pattern_table.iter().enumerate() {
-            let offset_frame = ((pos_y + offset_y) * SCREEN_WIDTH as usize + pos_x) * 4;
-            frame[offset_frame..offset_frame + 128 * 4].copy_from_slice(line);
+            let offset_frame_y = ((pos_y + offset_y) * SCREEN_WIDTH as usize + pos_x) * 4;
+            for (offset_x, color_idx) in line.iter().enumerate() {
+                let offset_frame_x = offset_frame_y + offset_x * 4;
+                frame[offset_frame_x..offset_frame_x + 4]
+                    .copy_from_slice(&PALETTE_2C02[*color_idx]);
+            }
+        }
+    }
+
+    fn set_video_pixel(&mut self, frame: &mut [u8], p: &SetPixel) {
+        match self.render_params.scaling_factor {
+            2 => {
+                let py = self.render_params.offset_y + p.pos.0 * 2;
+                let px = self.render_params.offset_x + p.pos.1 * 2;
+                let off0 =
+                    (py * self.render_params.width_y + px) * self.render_params.bytes_per_pixel;
+                let off1 =
+                    (py * self.render_params.width_y + px + 1) * self.render_params.bytes_per_pixel;
+                let off2 = ((py + 1) * self.render_params.width_y + px)
+                    * self.render_params.bytes_per_pixel;
+                let off3 = ((py + 1) * self.render_params.width_y + px + 1)
+                    * self.render_params.bytes_per_pixel;
+
+                frame[off0..off0 + self.render_params.bytes_per_pixel]
+                    .copy_from_slice(&PALETTE_2C02[p.color]);
+                frame[off1..off1 + self.render_params.bytes_per_pixel]
+                    .copy_from_slice(&PALETTE_2C02[p.color]);
+                frame[off2..off2 + self.render_params.bytes_per_pixel]
+                    .copy_from_slice(&PALETTE_2C02[p.color]);
+                frame[off3..off3 + self.render_params.bytes_per_pixel]
+                    .copy_from_slice(&PALETTE_2C02[p.color]);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn new(cart: Cartridge) -> Nessuno {
+        let mut system = System::new(cart);
+        let disasm = system.cpu_disassemble(0x0000, 0xffff);
+
+        Nessuno {
+            system,
+            disasm,
+            text_writer: TextWriter::new(
+                "res/cozette.bdf",
+                TextScreenParams {
+                    width: SCREEN_WIDTH as usize,
+                    height: SCREEN_HEIGHT as usize,
+                },
+            ),
+            render_params: VideoRenderParams {
+                offset_x: 30,
+                offset_y: 30,
+                width_y: SCREEN_WIDTH as usize,
+                scaling_factor: 2,
+                bytes_per_pixel: 4,
+            },
+            run: false,
+            t_residual: 0f64,
+            action: Some(UserAction::Reset),
+            display_oam: false,
+            palette_selected: 0,
+            paint: false,
+        }
+    }
+
+    pub fn frame(&mut self, frame: &mut [u8], wait_cpu_complete: bool) {
+        let mut cpu_complete = loop {
+            let clock_res = self.system.clock();
+            if let Some(p) = clock_res.set_pixel {
+                self.set_video_pixel(frame, &p);
+            }
+            if clock_res.frame_complete {
+                break clock_res.cpu_complete;
+            }
+        };
+
+        if wait_cpu_complete {
+            while !cpu_complete {
+                let clock_res = self.system.clock();
+                if let Some(p) = clock_res.set_pixel {
+                    self.set_video_pixel(frame, &p);
+                }
+                cpu_complete = clock_res.cpu_complete;
+            }
+        }
+    }
+
+    pub fn step(&mut self, frame: &mut [u8]) {
+        // Run cycles until the current CPU instruction has executed
+        loop {
+            let clock_res = self.system.clock();
+            if let Some(p) = clock_res.set_pixel {
+                self.set_video_pixel(frame, &p);
+            }
+            if clock_res.cpu_complete {
+                break;
+            }
+        }
+
+        // Run additional system clock cycles (e.g. PPU) until the next CPU instruction starts
+        loop {
+            let clock_res = self.system.clock();
+            if let Some(p) = clock_res.set_pixel {
+                self.set_video_pixel(frame, &p);
+            }
+            if !clock_res.cpu_complete {
+                break;
+            }
         }
     }
 }
@@ -287,7 +404,7 @@ impl ScreenBackend for Nessuno {
                 self.t_residual -= dt;
             } else {
                 self.t_residual += FRAME_DURATION - dt;
-                self.system.frame(frame.frame, false);
+                self.frame(frame.frame, false);
                 self.paint = true;
             }
         } else {
@@ -298,10 +415,10 @@ impl ScreenBackend for Nessuno {
                         self.draw_ppu_data(frame.frame);
                     }
                     UserAction::Step => {
-                        self.system.step(frame.frame);
+                        self.step(frame.frame);
                     }
                     UserAction::Frame => {
-                        self.system.frame(frame.frame, true);
+                        self.frame(frame.frame, true);
                     }
                     UserAction::PaletteSelect => {
                         self.draw_ppu_data(frame.frame);
@@ -362,40 +479,6 @@ impl ScreenBackend for Nessuno {
             self.palette_selected += 1;
             self.palette_selected &= 0x07;
             self.action = Some(UserAction::PaletteSelect);
-        }
-    }
-}
-
-impl Nessuno {
-    fn new(cart: Cartridge) -> Nessuno {
-        let mut system = System::new(
-            cart,
-            PpuRenderParams {
-                offset_x: 30,
-                offset_y: 30,
-                width_y: SCREEN_WIDTH as usize,
-                scaling_factor: 2,
-                bytes_per_pixel: 4,
-            },
-        );
-        let disasm = system.cpu_disassemble(0x0000, 0xffff);
-
-        Nessuno {
-            system,
-            disasm,
-            text_writer: TextWriter::new(
-                "res/cozette.bdf",
-                TextScreenParams {
-                    width: SCREEN_WIDTH as usize,
-                    height: SCREEN_HEIGHT as usize,
-                },
-            ),
-            run: false,
-            t_residual: 0f64,
-            action: Some(UserAction::Reset),
-            display_oam: false,
-            palette_selected: 0,
-            paint: false,
         }
     }
 }
