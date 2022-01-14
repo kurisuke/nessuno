@@ -1,3 +1,5 @@
+use crossbeam_channel::{bounded, Sender};
+use nessuno::audio;
 use nessuno::cartridge::Cartridge;
 use nessuno::controller::ControllerInput;
 use nessuno::cpu::{Disassembly, Flag};
@@ -23,11 +25,15 @@ const HL_COLOR: [u8; 4] = [0xbf, 0xbf, 0xff, 0xff];
 
 const FRAME_DURATION: f64 = 1f64 / 60f64;
 
+const AUDIO_BUFFER_SIZE: usize = 8192;
+
 struct Nessuno {
     system: System,
     disasm: Disassembly,
     text_writer: TextWriter,
     render_params: VideoRenderParams,
+
+    audio_send: Sender<f32>,
 
     run: bool,
     t_residual: f64,
@@ -288,8 +294,8 @@ impl Nessuno {
         }
     }
 
-    fn new(cart: Cartridge) -> Nessuno {
-        let mut system = System::new(cart, 48000);
+    fn new(cart: Cartridge, audio_send: Sender<f32>) -> Nessuno {
+        let mut system = System::new(cart, 44100);
         let disasm = system.cpu_disassemble(0x0000, 0xffff);
 
         Nessuno {
@@ -309,6 +315,7 @@ impl Nessuno {
                 scaling_factor: 2,
                 bytes_per_pixel: 4,
             },
+            audio_send,
             run: false,
             t_residual: 0f64,
             action: Some(UserAction::Reset),
@@ -318,11 +325,16 @@ impl Nessuno {
         }
     }
 
-    pub fn frame(&mut self, frame: &mut [u8], wait_cpu_complete: bool) {
+    pub fn frame(&mut self, frame: &mut [u8], wait_cpu_complete: bool, send_audio: bool) {
         let mut cpu_complete = loop {
             let clock_res = self.system.clock();
             if let Some(p) = clock_res.set_pixel {
                 self.set_video_pixel(frame, &p);
+            }
+            if send_audio {
+                if let Some(s) = clock_res.audio_sample {
+                    self.audio_send.try_send(s).unwrap_or(());
+                }
             }
             if clock_res.frame_complete {
                 break clock_res.cpu_complete;
@@ -334,6 +346,11 @@ impl Nessuno {
                 let clock_res = self.system.clock();
                 if let Some(p) = clock_res.set_pixel {
                     self.set_video_pixel(frame, &p);
+                }
+                if send_audio {
+                    if let Some(s) = clock_res.audio_sample {
+                        self.audio_send.try_send(s).unwrap();
+                    }
                 }
                 cpu_complete = clock_res.cpu_complete;
             }
@@ -404,7 +421,7 @@ impl ScreenBackend for Nessuno {
                 self.t_residual -= dt;
             } else {
                 self.t_residual += FRAME_DURATION - dt;
-                self.frame(frame.frame, false);
+                self.frame(frame.frame, false, true);
                 self.paint = true;
             }
         } else {
@@ -418,7 +435,7 @@ impl ScreenBackend for Nessuno {
                         self.step(frame.frame);
                     }
                     UserAction::Frame => {
-                        self.frame(frame.frame, true);
+                        self.frame(frame.frame, true, false);
                     }
                     UserAction::PaletteSelect => {
                         self.draw_ppu_data(frame.frame);
@@ -487,13 +504,17 @@ fn main() -> Result<(), io::Error> {
     let args: Vec<_> = env::args().collect();
     let cart = Cartridge::new(&args[1])?;
 
+    let (audio_send, audio_recv) = bounded(AUDIO_BUFFER_SIZE);
+
     let screen = Screen::new(ScreenParams {
         width: SCREEN_WIDTH,
         height: SCREEN_HEIGHT,
         title: "nessuno",
-        backend: Box::new(Nessuno::new(cart)),
+        backend: Box::new(Nessuno::new(cart, audio_send)),
     })
     .unwrap();
+
+    audio::run(audio_recv);
 
     screen.run();
 

@@ -1,3 +1,4 @@
+use crate::apu::Apu;
 use crate::bus::CpuBus;
 use crate::cartridge::Cartridge;
 use crate::controller::{Controller, ControllerInput};
@@ -18,6 +19,7 @@ pub struct System {
 struct Bus {
     ram_cpu: [u8; 2 * 1024],
     ppu: Ppu,
+    apu: Apu,
     cart: Cartridge,
     controller: [Controller; 2],
 
@@ -42,6 +44,7 @@ impl System {
             bus: Bus {
                 ram_cpu: [0; 2 * 1024],
                 ppu: Ppu::new(),
+                apu: Apu::new(),
                 cart,
                 controller: [Controller::new(), Controller::new()],
 
@@ -66,6 +69,7 @@ impl System {
         };
 
         let ppu_res = self.bus.ppu.clock(&mut self.bus.cart);
+        self.bus.apu.clock();
         res.set_pixel = ppu_res.set_pixel;
         res.frame_complete = ppu_res.frame_complete;
 
@@ -102,7 +106,7 @@ impl System {
         self.time_audio += TIME_PER_CLOCK;
         if self.time_audio >= self.time_per_sample {
             self.time_audio -= self.time_per_sample;
-            res.audio_sample = Some(0f32);
+            res.audio_sample = Some(self.bus.apu.get_output_sample());
         }
 
         if ppu_res.nmi {
@@ -209,13 +213,17 @@ impl CpuBus for Bus {
                 0x2000..=0x3fff => {
                     self.ppu.cpu_write(&mut self.cart, addr & 0x0007, data);
                 }
+                0x4000..=0x4013 | 0x4015 | 0x4017 => {
+                    self.apu.cpu_write(addr, data);
+                }
                 0x4014 => {
                     self.dma_page = data;
                     self.dma_addr = 0x00;
                     self.dma_transfer = true;
                 }
-                0x4016..=0x4017 => {
-                    self.controller[(addr & 0x0001) as usize].write();
+                0x4016 => {
+                    self.controller[0].write();
+                    self.controller[1].write();
                 }
                 _ => {}
             }
@@ -230,6 +238,7 @@ impl CpuBus for Bus {
                 // CPU Ram
                 0x0000..=0x1fff => self.ram_cpu[(addr & 0x07ff) as usize],
                 0x2000..=0x3fff => self.ppu.cpu_read(&mut self.cart, addr & 0x0007),
+                0x4015 => self.apu.cpu_read(addr),
                 0x4016..=0x4017 => self.controller[(addr & 0x0001) as usize].read(),
                 _ => 0,
             }
@@ -244,6 +253,7 @@ impl CpuBus for Bus {
                 // CPU Ram
                 0x0000..=0x1fff => self.ram_cpu[(addr & 0x07ff) as usize],
                 0x2000..=0x3fff => self.ppu.cpu_read_ro(addr & 0x0007),
+                0x4015 => self.apu.cpu_read(addr),
                 0x4016..=0x4017 => self.controller[(addr & 0x0001) as usize].read_ro(),
                 _ => 0,
             }
