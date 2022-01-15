@@ -65,6 +65,10 @@ impl Pulse {
         }
     }
 
+    pub fn get_lc_enable(&self) -> bool {
+        self.length_counter.get_enable()
+    }
+
     pub fn set_lc_enable(&mut self, enable: bool) {
         self.length_counter.set_enable(enable);
     }

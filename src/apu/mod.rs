@@ -60,8 +60,18 @@ impl Apu {
         }
     }
 
-    pub fn cpu_read(&self, _addr: u16) -> u8 {
-        0x00
+    pub fn cpu_read(&self, addr: u16) -> u8 {
+        match addr {
+            0x4015 => {
+                let mut status = 0;
+                status |= self.pulse[0].get_lc_enable() as u8;
+                status |= (self.pulse[1].get_lc_enable() as u8) << 1;
+                status |= (self.triangle.get_lc_enable() as u8) << 2;
+                status |= (self.noise.get_lc_enable() as u8) << 3;
+                status
+            }
+            _ => 0x00,
+        }
     }
 
     pub fn clock(&mut self) {

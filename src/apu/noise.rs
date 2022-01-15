@@ -37,12 +37,15 @@ impl Noise {
             }
             0x400f => {
                 let lc_counter = ((data & 0xf8) >> 5) as usize;
-
                 self.length_counter.set_counter(lc_counter);
                 self.envelope.flag_start = true;
             }
             _ => {}
         }
+    }
+
+    pub fn get_lc_enable(&self) -> bool {
+        self.length_counter.get_enable()
     }
 
     pub fn set_lc_enable(&mut self, enable: bool) {
@@ -92,7 +95,8 @@ impl ShiftReg {
             ((self.reg & 0x0001) != 0) ^ ((self.reg & 0x0002) != 0)
         };
         self.reg >>= 1;
-        self.reg = (self.reg & 0x3fff) | ((feedback as u16) << 14);
+        self.reg |= (feedback as u16) << 14;
+        self.reg &= 0x7fff;
     }
 
     fn is_muted(&self) -> bool {

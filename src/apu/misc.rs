@@ -62,6 +62,10 @@ impl LengthCounter {
         }
     }
 
+    pub fn get_enable(&self) -> bool {
+        self.enable
+    }
+
     pub fn set_enable(&mut self, enable: bool) {
         if enable {
             self.enable = true;
