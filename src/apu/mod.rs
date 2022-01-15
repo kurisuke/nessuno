@@ -1,5 +1,5 @@
 mod channel;
-mod lookup;
+mod misc;
 mod pulse;
 
 pub struct Apu {}
