@@ -892,6 +892,7 @@ enum StatusRegFlag {
 }
 
 impl StatusReg {
+    #[allow(dead_code)]
     pub fn get_flag(&self, f: StatusRegFlag) -> bool {
         self.reg & f.mask() != 0
     }
@@ -921,6 +922,7 @@ struct MaskReg {
     pub reg: u8,
 }
 
+#[allow(dead_code)]
 enum MaskRegFlag {
     Grayscale,
     RenderBgLeft,
@@ -937,6 +939,7 @@ impl MaskReg {
         self.reg & f.mask() != 0
     }
 
+    #[allow(dead_code)]
     fn set_flag(&mut self, f: MaskRegFlag, v: bool) {
         if v {
             // set flag
@@ -967,6 +970,7 @@ struct ControlReg {
     pub reg: u8,
 }
 
+#[allow(dead_code)]
 enum ControlRegFlag {
     NametableX,
     NametableY,
@@ -983,6 +987,7 @@ impl ControlReg {
         self.reg & f.mask() != 0
     }
 
+    #[allow(dead_code)]
     fn set_flag(&mut self, f: ControlRegFlag, v: bool) {
         if v {
             // set flag

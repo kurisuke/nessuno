@@ -12,11 +12,6 @@ pub struct Cartridge {
     mem_chr: Vec<u8>,
 
     hw_mirror: Mirror,
-
-    mapper_id: u8,
-    num_banks_prg: usize,
-    num_banks_chr: usize,
-
     mapper: Box<dyn Mapper>,
 }
 
@@ -30,15 +25,15 @@ pub enum Mirror {
 }
 
 struct CartridgeHeader {
-    name: [u8; 4],
+    _name: [u8; 4],
     prg_rom_chunks: u8,
     chr_rom_chunks: u8,
     mapper1: u8,
     mapper2: u8,
-    prg_ram_size: u8,
-    tv_system1: u8,
-    tv_system2: u8,
-    unused: [u8; 5],
+    _prg_ram_size: u8,
+    _tv_system1: u8,
+    _tv_system2: u8,
+    _unused: [u8; 5],
 }
 
 impl CartridgeHeader {
@@ -47,15 +42,15 @@ impl CartridgeHeader {
         reader.read_exact(&mut buf)?;
 
         let header = CartridgeHeader {
-            name: [buf[0], buf[1], buf[2], buf[3]],
+            _name: [buf[0], buf[1], buf[2], buf[3]],
             prg_rom_chunks: buf[4],
             chr_rom_chunks: buf[5],
             mapper1: buf[6],
             mapper2: buf[7],
-            prg_ram_size: buf[8],
-            tv_system1: buf[9],
-            tv_system2: buf[10],
-            unused: [buf[11], buf[12], buf[13], buf[14], buf[15]],
+            _prg_ram_size: buf[8],
+            _tv_system1: buf[9],
+            _tv_system2: buf[10],
+            _unused: [buf[11], buf[12], buf[13], buf[14], buf[15]],
         };
 
         Ok(header)
@@ -110,10 +105,7 @@ impl Cartridge {
                 Ok(Cartridge {
                     mem_prg,
                     mem_chr,
-                    mapper_id,
                     hw_mirror,
-                    num_banks_prg,
-                    num_banks_chr,
                     mapper,
                 })
             }

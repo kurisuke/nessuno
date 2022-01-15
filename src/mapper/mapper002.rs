@@ -1,7 +1,5 @@
 use super::{MapResult, Mapper};
 
-use crate::cartridge::Mirror;
-
 pub struct Mapper002 {
     num_banks_prg: usize,
     num_banks_chr: usize,

@@ -1,7 +1,5 @@
 use super::{MapResult, Mapper};
 
-use crate::cartridge::Mirror;
-
 pub struct Mapper000 {
     num_banks_prg: usize,
     num_banks_chr: usize,
@@ -43,7 +41,7 @@ impl Mapper for Mapper000 {
         }
     }
 
-    fn cpu_map_write(&mut self, addr: u16, data: u8) -> MapResult {
+    fn cpu_map_write(&mut self, addr: u16, _data: u8) -> MapResult {
         match addr {
             0x8000..=0xffff => {
                 if self.num_banks_prg > 1 {
