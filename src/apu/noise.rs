@@ -90,12 +90,12 @@ impl ShiftReg {
 
     fn clock(&mut self) {
         let feedback = if self.flag_mode {
-            ((self.reg & 0x0001) != 0) ^ ((self.reg & 0x0040) != 0)
+            (self.reg & 0x0001) ^ ((self.reg >> 6) & 0x0001)
         } else {
-            ((self.reg & 0x0001) != 0) ^ ((self.reg & 0x0002) != 0)
+            (self.reg & 0x0001) ^ ((self.reg >> 1) & 0x0001)
         };
         self.reg >>= 1;
-        self.reg |= (feedback as u16) << 14;
+        self.reg |= feedback << 14;
         self.reg &= 0x7fff;
     }
 
