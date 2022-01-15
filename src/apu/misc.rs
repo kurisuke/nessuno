@@ -1,31 +1,33 @@
 pub struct Timer {
-    load: u16,
+    pub period: u16,
     cur: u16,
 }
 
 impl Timer {
-    pub fn reset(&mut self, load: u16) {
-        self.load = load & 0x7ff;
-        self.cur = self.load;
+    pub fn reset(&mut self, period: u16) {
+        self.period = period & 0x7ff;
+        self.cur = self.period;
     }
-    
-    pub fn clock(&mut self) {
+
+    pub fn clock(&mut self) -> bool {
         if self.cur == 0 {
-            self.cur = self.load;
+            self.cur = self.period;
+            true
         } else {
             self.cur -= 1;
+            false
         }
     }
 
-    pub fn output(&self) -> u8 {
-        (self.cur >= 8) as u8
+    pub fn is_muted(&self) -> bool {
+        self.cur < 8
     }
 }
 
 pub struct LengthCounter {
     counter: u8,
     halt: bool,
-    enable: bool
+    enable: bool,
 }
 
 impl LengthCounter {
@@ -48,54 +50,24 @@ impl LengthCounter {
         self.halt = halt;
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock_half_frame(&mut self) {
         if self.counter > 0 && !self.halt {
             self.counter -= 1;
         }
     }
 
-    pub fn output(&self) -> u8 {
-        self.counter
+    pub fn is_muted(&self) -> bool {
+        self.counter == 0
     }
 }
 
 const LENGTH_TABLE: [u8; 32] = [
-    10,
-    254,
-    20,
-    2,
-    40,
-    4,
-    80,
-    6,
-    160,
-    8,
-    60,
-    10,
-    14,
-    12,
-    26,
-    14,
-    12,
-    16,
-    24,
-    18,
-    48,
-    20,
-    96,
-    22,
-    192,
-    24,
-    72,
-    26,
-    16,
-    28,
-    32,
-    30,
+    10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
+    192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
 pub struct Sequencer {
-    seq: u8
+    seq: u8,
 }
 
 impl Sequencer {
@@ -107,14 +79,9 @@ impl Sequencer {
         self.seq = self.seq.rotate_right(1);
     }
 
-    pub fn output(&self) -> u8 {
-        (self.seq & 0x01 == 0) as u8
+    pub fn is_muted(&self) -> bool {
+        self.seq & 0x01 == 0
     }
 }
 
-const SEQUENCES: [u8; 4] = [
-    0b01000000,
-    0b01100000,
-    0b01111000,
-    0b10011111,
-];
+const SEQUENCES: [u8; 4] = [0b01000000, 0b01100000, 0b01111000, 0b10011111];
