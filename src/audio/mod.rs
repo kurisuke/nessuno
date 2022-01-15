@@ -4,7 +4,7 @@ use crossbeam_channel::Receiver;
 use std::thread;
 use std::time::Duration;
 
-const BUFFER_SIZE: u32 = 4096;
+pub const BUFFER_SIZE: u32 = 2048;
 const MIN_SAMPLE_RATE: u32 = 44100;
 
 pub fn run(audio_recv: Receiver<f32>) {

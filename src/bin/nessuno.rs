@@ -25,7 +25,7 @@ const HL_COLOR: [u8; 4] = [0xbf, 0xbf, 0xff, 0xff];
 
 const FRAME_DURATION: f64 = 1f64 / 60f64;
 
-const AUDIO_BUFFER_SIZE: usize = 8192;
+const AUDIO_BUFFER_SIZE: usize = (crate::audio::BUFFER_SIZE as usize) * 2;
 
 struct Nessuno {
     system: System,
@@ -357,6 +357,19 @@ impl Nessuno {
         }
     }
 
+    pub fn run_until_audio(&mut self, frame: &mut [u8]) {
+        loop {
+            let clock_res = self.system.clock();
+            if let Some(p) = clock_res.set_pixel {
+                self.set_video_pixel(frame, &p);
+            }
+            if let Some(s) = clock_res.audio_sample {
+                self.audio_send.try_send(s).unwrap_or(());
+                break;
+            }
+        }
+    }
+
     pub fn step(&mut self, frame: &mut [u8]) {
         // Run cycles until the current CPU instruction has executed
         loop {
@@ -417,6 +430,10 @@ impl ScreenBackend for Nessuno {
 
     fn update(&mut self, frame: Frame, dt: f64) {
         if self.run {
+            while self.audio_send.len() < AUDIO_BUFFER_SIZE / 2 {
+                self.run_until_audio(frame.frame);
+            }
+
             if self.t_residual > 0f64 {
                 self.t_residual -= dt;
             } else {
