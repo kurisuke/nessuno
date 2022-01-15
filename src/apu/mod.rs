@@ -1,15 +1,18 @@
 mod misc;
 mod mixer;
+mod noise;
 mod pulse;
 mod triangle;
 
 use mixer::Mixer;
+use noise::Noise;
 use pulse::Pulse;
 use triangle::Triangle;
 
 pub struct Apu {
     pulse: [Pulse; 2],
     triangle: Triangle,
+    noise: Noise,
     mixer: Mixer,
     frame_counter: FrameCounter,
 }
@@ -19,6 +22,7 @@ impl Apu {
         Apu {
             pulse: [Pulse::new(0), Pulse::new(1)],
             triangle: Triangle::new(),
+            noise: Noise::new(),
             mixer: Mixer::new(),
             frame_counter: FrameCounter::new(),
         }
@@ -32,13 +36,17 @@ impl Apu {
             0x4004..=0x4007 => {
                 self.pulse[1].cpu_write(addr, data);
             }
-            0x4008 | 0x400a | 0x400b => {
+            0x4008..=0x400b => {
                 self.triangle.cpu_write(addr, data);
+            }
+            0x400c..=0x400f => {
+                self.noise.cpu_write(addr, data);
             }
             0x4015 => {
                 self.pulse[0].set_lc_enable((data & 0x01) != 0);
                 self.pulse[1].set_lc_enable((data & 0x02) != 0);
                 self.triangle.set_lc_enable((data & 0x04) != 0);
+                self.noise.set_lc_enable((data & 0x08) != 0);
             }
             0x4017 => {
                 self.frame_counter.mode = if (data & 0x80) != 0 {
@@ -64,16 +72,19 @@ impl Apu {
         if clock_events.apu_cycle {
             self.pulse[0].clock_apu();
             self.pulse[1].clock_apu();
+            self.noise.clock_apu();
         }
         if clock_events.quarter_frame {
             self.pulse[0].clock_quarter_frame();
             self.pulse[1].clock_quarter_frame();
             self.triangle.clock_quarter_frame();
+            self.noise.clock_quarter_frame();
         }
         if clock_events.half_frame {
             self.pulse[0].clock_half_frame();
             self.pulse[1].clock_half_frame();
             self.triangle.clock_half_frame();
+            self.noise.clock_half_frame();
         }
 
         self.pulse[0].clock_ppu();
@@ -85,7 +96,7 @@ impl Apu {
             self.pulse[0].sample(),
             self.pulse[1].sample(),
             self.triangle.sample(),
-            0,
+            self.noise.sample(),
             0,
         )
     }

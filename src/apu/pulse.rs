@@ -1,4 +1,4 @@
-use super::misc::{LengthCounter, Sequencer, Timer};
+use super::misc::{Envelope, LengthCounter, Sequencer, Timer};
 
 pub struct Pulse {
     envelope: Envelope,
@@ -99,62 +99,6 @@ impl Pulse {
             0
         } else {
             self.envelope.output()
-        }
-    }
-}
-
-struct Envelope {
-    pub flag_start: bool,
-    pub flag_loop: bool,
-    pub flag_const: bool,
-    divider: u8,
-    decay_level: u8,
-    volume: u8,
-}
-
-impl Envelope {
-    fn new() -> Envelope {
-        Envelope {
-            flag_start: false,
-            flag_loop: false,
-            flag_const: false,
-            divider: 0x00,
-            decay_level: 0x00,
-            volume: 0x00,
-        }
-    }
-
-    fn set_volume(&mut self, volume: u8) {
-        self.volume = volume & 0x0f;
-    }
-
-    fn clock_quarter_frame(&mut self) {
-        if self.flag_start {
-            self.decay_level = 15;
-            self.divider = self.volume;
-            self.flag_start = false;
-        } else {
-            if self.divider == 0 {
-                self.divider = self.volume;
-
-                if self.decay_level == 0 {
-                    if self.flag_loop {
-                        self.decay_level = 15;
-                    }
-                } else {
-                    self.decay_level -= 1;
-                }
-            } else {
-                self.divider -= 1;
-            }
-        }
-    }
-
-    fn output(&self) -> u8 {
-        if self.flag_const {
-            self.volume
-        } else {
-            self.decay_level
         }
     }
 }
