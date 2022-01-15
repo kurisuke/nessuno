@@ -1,41 +1,96 @@
 use super::misc::{LengthCounter, Sequencer, Timer};
 
-struct Pulse {
+pub struct Pulse {
     envelope: Envelope,
     sweep: Sweep,
     timer: Timer,
     sequencer: Sequencer,
     length_counter: LengthCounter,
-    cpu_clock_counter: usize,
 }
 
 impl Pulse {
-    fn clock_ppu(&mut self) {
+    pub fn new(i: usize) -> Pulse {
+        Pulse {
+            envelope: Envelope::new(),
+            sweep: Sweep::new((i & 0x1) as u16),
+            timer: Timer::new(),
+            sequencer: Sequencer::new(),
+            length_counter: LengthCounter::new(),
+        }
+    }
+
+    pub fn cpu_write(&mut self, addr: u16, data: u8) {
+        match addr & 0x0003 {
+            0 => {
+                // $4000 / $4004
+                let seq_idx = ((data & 0xc0) >> 6) as usize;
+                let lc_flag_halt = (data & 0x20) != 0;
+                let env_flag_const = (data & 0x10) != 0;
+                let env_volume = data & 0x0f;
+
+                self.sequencer.set_seq(seq_idx);
+                self.length_counter.halt = lc_flag_halt;
+                self.envelope.flag_const = env_flag_const;
+                self.envelope.set_volume(env_volume);
+            }
+            1 => {
+                // $4001 / $4005
+                let sweep_enabled = (data & 0x80) != 0;
+                let sweep_divider_reload = (data & 0x70) >> 4;
+                let sweep_negate = (data & 0x08) != 0;
+                let sweep_shift_count = data & 0x07;
+
+                self.sweep.flag_enabled = sweep_enabled;
+                self.sweep.set_divider_reload(sweep_divider_reload);
+                self.sweep.flag_negate = sweep_negate;
+                self.sweep.set_shift_count(sweep_shift_count);
+                self.sweep.flag_reload = true;
+            }
+            2 => {
+                // $4002 / $4006
+                self.timer.set_period_lo(data);
+            }
+            3 => {
+                // $4003 / $4007
+                let lc_counter = ((data & 0xf8) >> 5) as usize;
+                let timer_period_hi = data & 0x07;
+
+                self.length_counter.set_counter(lc_counter);
+                self.timer.set_period_hi(timer_period_hi);
+
+                self.sequencer.restart();
+                self.envelope.flag_start = true;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn set_lc_enable(&mut self, enable: bool) {
+        self.length_counter.set_enable(enable);
+    }
+
+    pub fn clock_ppu(&mut self) {
         self.sweep.track_sweep(self.timer.period);
     }
 
-    fn clock_cpu(&mut self) {
-        self.cpu_clock_counter += 1;
-        if self.cpu_clock_counter % 2 == 0 {
-            // clock timer & sequencer
-            if self.timer.clock() {
-                self.sequencer.clock();
-            }
+    pub fn clock_apu(&mut self) {
+        if self.timer.clock() {
+            self.sequencer.clock();
         }
     }
 
-    fn clock_quarter_frame(&mut self) {
+    pub fn clock_quarter_frame(&mut self) {
         self.envelope.clock_quarter_frame();
     }
 
-    fn clock_half_frame(&mut self) {
+    pub fn clock_half_frame(&mut self) {
         self.length_counter.clock_half_frame();
         if let Some(new_period) = self.sweep.clock_half_frame() {
-            self.timer.reset(new_period);
+            self.timer.set_period(new_period);
         }
     }
 
-    fn sample(&self) -> u8 {
+    pub fn sample(&self) -> u8 {
         if self.sequencer.is_muted()
             || self.sweep.is_muted()
             || self.timer.is_muted()
@@ -58,6 +113,17 @@ struct Envelope {
 }
 
 impl Envelope {
+    fn new() -> Envelope {
+        Envelope {
+            flag_start: false,
+            flag_loop: false,
+            flag_const: false,
+            divider: 0x00,
+            decay_level: 0x00,
+            volume: 0x00,
+        }
+    }
+
     fn set_volume(&mut self, volume: u8) {
         self.volume = volume & 0x0f;
     }
@@ -66,6 +132,7 @@ impl Envelope {
         if self.flag_start {
             self.decay_level = 15;
             self.divider = self.volume;
+            self.flag_start = false;
         } else {
             if self.divider == 0 {
                 self.divider = self.volume;
@@ -105,6 +172,20 @@ struct Sweep {
 }
 
 impl Sweep {
+    fn new(neg_offset: u16) -> Sweep {
+        Sweep {
+            flag_enabled: false,
+            flag_negate: false,
+            flag_reload: false,
+            target_period: 0x0000,
+            cur_period: 0x0000,
+            shift_count: 0,
+            neg_offset,
+            divider: 0x00,
+            divider_reload: 0x00,
+        }
+    }
+
     fn set_divider_reload(&mut self, divider_reload: u8) {
         self.divider_reload = divider_reload & 0x07;
     }

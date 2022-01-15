@@ -4,8 +4,25 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn reset(&mut self, period: u16) {
+    pub fn new() -> Timer {
+        Timer {
+            period: 0x0000,
+            cur: 0x0000,
+        }
+    }
+
+    pub fn set_period(&mut self, period: u16) {
         self.period = period & 0x7ff;
+        self.cur = self.period;
+    }
+
+    pub fn set_period_hi(&mut self, period_hi: u8) {
+        self.period = (self.period & 0x00ff) | ((period_hi as u16 & 0x0007) << 8);
+        self.cur = self.period;
+    }
+
+    pub fn set_period_lo(&mut self, period_lo: u8) {
+        self.period = (self.period & 0x0700) | (period_lo as u16 & 0x00ff);
         self.cur = self.period;
     }
 
@@ -26,11 +43,19 @@ impl Timer {
 
 pub struct LengthCounter {
     counter: u8,
-    halt: bool,
+    pub halt: bool,
     enable: bool,
 }
 
 impl LengthCounter {
+    pub fn new() -> LengthCounter {
+        LengthCounter {
+            counter: LENGTH_TABLE[0],
+            halt: false,
+            enable: false,
+        }
+    }
+
     pub fn set_counter(&mut self, table_idx: usize) {
         if self.enable {
             self.counter = LENGTH_TABLE[table_idx & 0x1f];
@@ -44,10 +69,6 @@ impl LengthCounter {
             self.enable = false;
             self.counter = 0;
         }
-    }
-
-    pub fn set_halt(&mut self, halt: bool) {
-        self.halt = halt;
     }
 
     pub fn clock_half_frame(&mut self) {
@@ -68,15 +89,30 @@ const LENGTH_TABLE: [u8; 32] = [
 
 pub struct Sequencer {
     seq: u8,
+    pos: u32,
 }
 
 impl Sequencer {
-    pub fn reset(&mut self, seq_idx: usize) {
+    pub fn new() -> Sequencer {
+        Sequencer {
+            seq: SEQUENCES[0],
+            pos: 0,
+        }
+    }
+
+    pub fn restart(&mut self) {
+        self.seq = self.seq.rotate_left(self.pos);
+        self.pos = 0;
+    }
+
+    pub fn set_seq(&mut self, seq_idx: usize) {
         self.seq = SEQUENCES[seq_idx & 0x03];
+        self.seq = self.seq.rotate_right(self.pos);
     }
 
     pub fn clock(&mut self) {
         self.seq = self.seq.rotate_right(1);
+        self.pos = (self.pos + 1) % 8;
     }
 
     pub fn is_muted(&self) -> bool {
