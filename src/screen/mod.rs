@@ -2,7 +2,6 @@ pub mod backend;
 pub mod textwriter;
 
 use backend::{Frame, ScreenBackend};
-use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
 use std::time::Instant;
 use winit::dpi::LogicalSize;
@@ -77,12 +76,7 @@ impl<'a> Screen<'a> {
                     width: self.params.width,
                     height: self.params.height,
                 });
-                if self
-                    .pixels
-                    .render()
-                    .map_err(|e| error!("pixels.render() failed: {}", e))
-                    .is_err()
-                {
+                if self.pixels.render().is_err() {
                     *control_flow = ControlFlow::Exit;
                     return;
                 }
