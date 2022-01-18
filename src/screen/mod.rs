@@ -67,10 +67,16 @@ impl<'a> Screen<'a> {
 
     pub fn run(mut self) {
         let fullscreen_cfg = Some(Fullscreen::Borderless(self.event_loop.primary_monitor()));
-        self.window.set_fullscreen(match self.fullscreen {
-            true => fullscreen_cfg.clone(),
-            false => None,
-        });
+        match self.fullscreen {
+            true => {
+                self.window.set_fullscreen(fullscreen_cfg.clone());
+                self.window.set_cursor_visible(false);
+            }
+            false => {
+                self.window.set_fullscreen(None);
+                self.window.set_cursor_visible(true);
+            }
+        }
 
         self.time = Instant::now();
         self.event_loop.run(move |event, _, control_flow| {
@@ -98,10 +104,16 @@ impl<'a> Screen<'a> {
                 if self.input.key_pressed(VirtualKeyCode::F11) {
                     // toggle fullscreen
                     self.fullscreen = !self.fullscreen;
-                    self.window.set_fullscreen(match self.fullscreen {
-                        true => fullscreen_cfg.clone(),
-                        false => None,
-                    });
+                    match self.fullscreen {
+                        true => {
+                            self.window.set_fullscreen(fullscreen_cfg.clone());
+                            self.window.set_cursor_visible(false);
+                        }
+                        false => {
+                            self.window.set_fullscreen(None);
+                            self.window.set_cursor_visible(true);
+                        }
+                    }
                 }
 
                 // Let other input be handled by backend
