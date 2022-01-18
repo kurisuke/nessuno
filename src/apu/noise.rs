@@ -25,6 +25,7 @@ impl Noise {
                 let env_volume = data & 0x0f;
 
                 self.length_counter.halt = lc_flag_halt;
+                self.envelope.flag_loop = lc_flag_halt;
                 self.envelope.flag_const = env_flag_const;
                 self.envelope.set_volume(env_volume);
             }
@@ -36,7 +37,7 @@ impl Noise {
                 self.shift_reg.flag_mode = sr_flag_mode;
             }
             0x400f => {
-                let lc_counter = ((data & 0xf8) >> 5) as usize;
+                let lc_counter = ((data & 0xf8) >> 3) as usize;
                 self.length_counter.set_counter(lc_counter);
                 self.envelope.flag_start = true;
             }

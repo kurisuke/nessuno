@@ -30,6 +30,7 @@ impl Pulse {
 
                 self.sequencer.set_seq(seq_idx);
                 self.length_counter.halt = lc_flag_halt;
+                self.envelope.flag_loop = lc_flag_halt;
                 self.envelope.flag_const = env_flag_const;
                 self.envelope.set_volume(env_volume);
             }
@@ -52,7 +53,7 @@ impl Pulse {
             }
             3 => {
                 // $4003 / $4007
-                let lc_counter = ((data & 0xf8) >> 5) as usize;
+                let lc_counter = ((data & 0xf8) >> 3) as usize;
                 let timer_period_hi = data & 0x07;
 
                 self.length_counter.set_counter(lc_counter);
