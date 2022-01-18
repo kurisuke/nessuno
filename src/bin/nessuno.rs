@@ -1,3 +1,4 @@
+use clap::Parser;
 use crossbeam_channel::{bounded, Sender};
 use nessuno::audio;
 use nessuno::cartridge::Cartridge;
@@ -9,13 +10,15 @@ use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
 use nessuno::system::System;
-use std::env;
 use std::io;
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
 const SCREEN_WIDTH: u32 = 960;
 const SCREEN_HEIGHT: u32 = 540;
+
+const SCREEN_WIDTH_MIN: u32 = 256;
+const SCREEN_HEIGHT_MIN: u32 = 240;
 
 const FG_COLOR: [u8; 4] = [0xff, 0xff, 0xff, 0xff];
 const BG_COLOR: [u8; 4] = [0x00, 0x00, 0x7f, 0xff];
@@ -27,20 +30,12 @@ const FRAME_DURATION: f64 = 1f64 / 60f64;
 
 const AUDIO_BUFFER_SIZE: usize = (crate::audio::BUFFER_SIZE as usize) * 2;
 
-struct Nessuno {
-    system: System,
-    disasm: Disassembly,
-    text_writer: TextWriter,
-    render_params: VideoRenderParams,
-
-    audio_send: Sender<f32>,
-
-    run: bool,
-    t_residual: f64,
-    action: Option<UserAction>,
-    display_oam: bool,
-    palette_selected: usize,
-    paint: bool,
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    rom_file: String,
+    #[clap(short, long)]
+    debug: bool,
 }
 
 struct VideoRenderParams {
@@ -56,6 +51,22 @@ enum UserAction {
     Step,
     Frame,
     PaletteSelect,
+}
+
+struct Nessuno {
+    system: System,
+    disasm: Disassembly,
+    text_writer: TextWriter,
+    render_params: VideoRenderParams,
+
+    audio_send: Sender<f32>,
+
+    run: bool,
+    t_residual: f64,
+    action: Option<UserAction>,
+    display_oam: bool,
+    palette_selected: usize,
+    paint: bool,
 }
 
 impl Nessuno {
@@ -267,33 +278,6 @@ impl Nessuno {
         }
     }
 
-    fn set_video_pixel(&mut self, frame: &mut [u8], p: &SetPixel) {
-        match self.render_params.scaling_factor {
-            2 => {
-                let py = self.render_params.offset_y + p.pos.0 * 2;
-                let px = self.render_params.offset_x + p.pos.1 * 2;
-                let off0 =
-                    (py * self.render_params.width_y + px) * self.render_params.bytes_per_pixel;
-                let off1 =
-                    (py * self.render_params.width_y + px + 1) * self.render_params.bytes_per_pixel;
-                let off2 = ((py + 1) * self.render_params.width_y + px)
-                    * self.render_params.bytes_per_pixel;
-                let off3 = ((py + 1) * self.render_params.width_y + px + 1)
-                    * self.render_params.bytes_per_pixel;
-
-                frame[off0..off0 + self.render_params.bytes_per_pixel]
-                    .copy_from_slice(&PALETTE_2C02[p.color]);
-                frame[off1..off1 + self.render_params.bytes_per_pixel]
-                    .copy_from_slice(&PALETTE_2C02[p.color]);
-                frame[off2..off2 + self.render_params.bytes_per_pixel]
-                    .copy_from_slice(&PALETTE_2C02[p.color]);
-                frame[off3..off3 + self.render_params.bytes_per_pixel]
-                    .copy_from_slice(&PALETTE_2C02[p.color]);
-            }
-            _ => unreachable!(),
-        }
-    }
-
     fn new(cart: Cartridge, audio_send: Sender<f32>) -> Nessuno {
         let mut system = System::new(cart, 44100);
         let disasm = system.cpu_disassemble(0x0000, 0xffff);
@@ -329,7 +313,7 @@ impl Nessuno {
         let mut cpu_complete = loop {
             let clock_res = self.system.clock();
             if let Some(p) = clock_res.set_pixel {
-                self.set_video_pixel(frame, &p);
+                set_video_pixel(&self.render_params, frame, &p);
             }
             if send_audio {
                 if let Some(s) = clock_res.audio_sample {
@@ -345,7 +329,7 @@ impl Nessuno {
             while !cpu_complete {
                 let clock_res = self.system.clock();
                 if let Some(p) = clock_res.set_pixel {
-                    self.set_video_pixel(frame, &p);
+                    set_video_pixel(&self.render_params, frame, &p);
                 }
                 if send_audio {
                     if let Some(s) = clock_res.audio_sample {
@@ -361,7 +345,7 @@ impl Nessuno {
         loop {
             let clock_res = self.system.clock();
             if let Some(p) = clock_res.set_pixel {
-                self.set_video_pixel(frame, &p);
+                set_video_pixel(&self.render_params, frame, &p);
             }
             if let Some(s) = clock_res.audio_sample {
                 self.audio_send.try_send(s).unwrap_or(());
@@ -375,7 +359,7 @@ impl Nessuno {
         loop {
             let clock_res = self.system.clock();
             if let Some(p) = clock_res.set_pixel {
-                self.set_video_pixel(frame, &p);
+                set_video_pixel(&self.render_params, frame, &p);
             }
             if clock_res.cpu_complete {
                 break;
@@ -386,7 +370,7 @@ impl Nessuno {
         loop {
             let clock_res = self.system.clock();
             if let Some(p) = clock_res.set_pixel {
-                self.set_video_pixel(frame, &p);
+                set_video_pixel(&self.render_params, frame, &p);
             }
             if !clock_res.cpu_complete {
                 break;
@@ -398,7 +382,7 @@ impl Nessuno {
 impl ScreenBackend for Nessuno {
     fn init(&self, frame: Frame) {
         for pixel in frame.frame.chunks_exact_mut(4) {
-            pixel.copy_from_slice(&[0x00, 0x00, 0x7f, 0xff]);
+            pixel.copy_from_slice(&BG_COLOR);
         }
         self.text_writer.write(
             frame.frame,
@@ -517,19 +501,178 @@ impl ScreenBackend for Nessuno {
     }
 }
 
+struct NessunoMin {
+    system: System,
+    render_params: VideoRenderParams,
+
+    audio_send: Sender<f32>,
+    run: bool,
+    t_residual: f64,
+}
+
+impl NessunoMin {
+    fn new(cart: Cartridge, audio_send: Sender<f32>) -> NessunoMin {
+        let mut system = System::new(cart, 44100);
+        system.reset();
+        NessunoMin {
+            system,
+            render_params: VideoRenderParams {
+                offset_x: 0,
+                offset_y: 0,
+                width_y: SCREEN_WIDTH_MIN as usize,
+                scaling_factor: 1,
+                bytes_per_pixel: 4,
+            },
+            audio_send,
+            run: true,
+            t_residual: 0f64,
+        }
+    }
+
+    pub fn run_until_audio(&mut self, frame: &mut [u8]) {
+        loop {
+            let clock_res = self.system.clock();
+            if let Some(p) = clock_res.set_pixel {
+                set_video_pixel(&self.render_params, frame, &p);
+            }
+            if let Some(s) = clock_res.audio_sample {
+                self.audio_send.try_send(s).unwrap_or(());
+                break;
+            }
+        }
+    }
+
+    pub fn frame(&mut self, frame: &mut [u8]) {
+        loop {
+            let clock_res = self.system.clock();
+            if let Some(p) = clock_res.set_pixel {
+                set_video_pixel(&self.render_params, frame, &p);
+            }
+            if let Some(s) = clock_res.audio_sample {
+                self.audio_send.try_send(s).unwrap_or(());
+            }
+            if clock_res.frame_complete {
+                break;
+            }
+        }
+    }
+}
+
+impl ScreenBackend for NessunoMin {
+    fn init(&self, frame: Frame) {
+        for pixel in frame.frame.chunks_exact_mut(4) {
+            pixel.copy_from_slice(&BG_COLOR);
+        }
+    }
+
+    fn draw(&self, _frame: Frame) {}
+
+    fn update(&mut self, frame: Frame, dt: f64) {
+        if self.run {
+            while self.audio_send.len() < AUDIO_BUFFER_SIZE / 2 {
+                self.run_until_audio(frame.frame);
+            }
+
+            if self.t_residual > 0f64 {
+                self.t_residual -= dt;
+            } else {
+                self.t_residual += FRAME_DURATION - dt;
+                self.frame(frame.frame);
+            }
+        }
+    }
+
+    fn handle_input(&mut self, input: &WinitInputHelper) {
+        // CONTROLLER INPUT
+        let mut input_c1 = vec![];
+        if input.key_held(VirtualKeyCode::Left) {
+            input_c1.push(ControllerInput::Left);
+        }
+        if input.key_held(VirtualKeyCode::Right) {
+            input_c1.push(ControllerInput::Right);
+        }
+        if input.key_held(VirtualKeyCode::Up) {
+            input_c1.push(ControllerInput::Up);
+        }
+        if input.key_held(VirtualKeyCode::Down) {
+            input_c1.push(ControllerInput::Down);
+        }
+        if input.key_held(VirtualKeyCode::Key1) {
+            input_c1.push(ControllerInput::B);
+        }
+        if input.key_held(VirtualKeyCode::Key2) {
+            input_c1.push(ControllerInput::A);
+        }
+        if input.key_held(VirtualKeyCode::Key3) {
+            input_c1.push(ControllerInput::Select);
+        }
+        if input.key_held(VirtualKeyCode::Key4) {
+            input_c1.push(ControllerInput::Start);
+        }
+        self.system.controller_update(&input_c1, &vec![]);
+
+        // DEBUG KEYS
+        if input.key_pressed(VirtualKeyCode::Space) {
+            self.run = !self.run;
+            if !self.run {
+                self.t_residual = 0f64;
+            }
+        }
+    }
+}
+
+fn set_video_pixel(render_params: &VideoRenderParams, frame: &mut [u8], p: &SetPixel) {
+    match render_params.scaling_factor {
+        1 => {
+            let py = render_params.offset_y + p.pos.0;
+            let px = render_params.offset_x + p.pos.1;
+            let off = (py * render_params.width_y + px) * render_params.bytes_per_pixel;
+            frame[off..off + render_params.bytes_per_pixel].copy_from_slice(&PALETTE_2C02[p.color]);
+        }
+        2 => {
+            let py = render_params.offset_y + p.pos.0 * 2;
+            let px = render_params.offset_x + p.pos.1 * 2;
+            let off0 = (py * render_params.width_y + px) * render_params.bytes_per_pixel;
+            let off1 = (py * render_params.width_y + px + 1) * render_params.bytes_per_pixel;
+            let off2 = ((py + 1) * render_params.width_y + px) * render_params.bytes_per_pixel;
+            let off3 = ((py + 1) * render_params.width_y + px + 1) * render_params.bytes_per_pixel;
+
+            frame[off0..off0 + render_params.bytes_per_pixel]
+                .copy_from_slice(&PALETTE_2C02[p.color]);
+            frame[off1..off1 + render_params.bytes_per_pixel]
+                .copy_from_slice(&PALETTE_2C02[p.color]);
+            frame[off2..off2 + render_params.bytes_per_pixel]
+                .copy_from_slice(&PALETTE_2C02[p.color]);
+            frame[off3..off3 + render_params.bytes_per_pixel]
+                .copy_from_slice(&PALETTE_2C02[p.color]);
+        }
+        _ => unreachable!(),
+    }
+}
+
 fn main() -> Result<(), io::Error> {
-    let args: Vec<_> = env::args().collect();
-    let cart = Cartridge::new(&args[1])?;
+    let args = Args::parse();
+    let cart = Cartridge::new(&args.rom_file)?;
 
     let (audio_send, audio_recv) = bounded(AUDIO_BUFFER_SIZE);
 
-    let screen = Screen::new(ScreenParams {
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
-        title: "nessuno",
-        backend: Box::new(Nessuno::new(cart, audio_send)),
-    })
-    .unwrap();
+    let screen = if args.debug {
+        Screen::new(ScreenParams {
+            width: SCREEN_WIDTH,
+            height: SCREEN_HEIGHT,
+            title: "nessuno",
+            backend: Box::new(Nessuno::new(cart, audio_send)),
+        })
+        .unwrap()
+    } else {
+        Screen::new(ScreenParams {
+            width: SCREEN_WIDTH_MIN,
+            height: SCREEN_HEIGHT_MIN,
+            title: "nessuno",
+            backend: Box::new(NessunoMin::new(cart, audio_send)),
+        })
+        .unwrap()
+    };
 
     audio::run(audio_recv);
 
