@@ -36,6 +36,8 @@ struct Args {
     rom_file: String,
     #[clap(short, long)]
     debug: bool,
+    #[clap(short, long)]
+    fullscreen: bool,
 }
 
 struct VideoRenderParams {
@@ -657,20 +659,26 @@ fn main() -> Result<(), io::Error> {
     let (audio_send, audio_recv) = bounded(AUDIO_BUFFER_SIZE);
 
     let screen = if args.debug {
-        Screen::new(ScreenParams {
-            width: SCREEN_WIDTH,
-            height: SCREEN_HEIGHT,
-            title: "nessuno",
-            backend: Box::new(Nessuno::new(cart, audio_send)),
-        })
+        Screen::new(
+            ScreenParams {
+                width: SCREEN_WIDTH,
+                height: SCREEN_HEIGHT,
+                title: "nessuno",
+                backend: Box::new(Nessuno::new(cart, audio_send)),
+            },
+            args.fullscreen,
+        )
         .unwrap()
     } else {
-        Screen::new(ScreenParams {
-            width: SCREEN_WIDTH_MIN,
-            height: SCREEN_HEIGHT_MIN,
-            title: "nessuno",
-            backend: Box::new(NessunoMin::new(cart, audio_send)),
-        })
+        Screen::new(
+            ScreenParams {
+                width: SCREEN_WIDTH_MIN,
+                height: SCREEN_HEIGHT_MIN,
+                title: "nessuno",
+                backend: Box::new(NessunoMin::new(cart, audio_send)),
+            },
+            args.fullscreen,
+        )
         .unwrap()
     };
 

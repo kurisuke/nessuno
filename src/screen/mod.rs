@@ -28,7 +28,7 @@ pub struct ScreenParams<'a> {
 }
 
 impl<'a> Screen<'a> {
-    pub fn new(params: ScreenParams) -> Result<Screen, Error> {
+    pub fn new(params: ScreenParams, fullscreen: bool) -> Result<Screen, Error> {
         let event_loop = EventLoop::new();
         let input = WinitInputHelper::new();
         let window = {
@@ -61,12 +61,17 @@ impl<'a> Screen<'a> {
             pixels,
             event_loop,
             time: Instant::now(),
-            fullscreen: false,
+            fullscreen,
         })
     }
 
     pub fn run(mut self) {
         let fullscreen_cfg = Some(Fullscreen::Borderless(self.event_loop.primary_monitor()));
+        self.window.set_fullscreen(match self.fullscreen {
+            true => fullscreen_cfg.clone(),
+            false => None,
+        });
+
         self.time = Instant::now();
         self.event_loop.run(move |event, _, control_flow| {
             // Draw the current frame

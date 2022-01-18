@@ -277,12 +277,15 @@ impl DebugCpu {
 }
 
 fn main() {
-    let screen = Screen::new(ScreenParams {
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
-        title: "debug_cpu",
-        backend: Box::new(DebugCpu::new()),
-    })
+    let screen = Screen::new(
+        ScreenParams {
+            width: SCREEN_WIDTH,
+            height: SCREEN_HEIGHT,
+            title: "debug_cpu",
+            backend: Box::new(DebugCpu::new()),
+        },
+        false,
+    )
     .unwrap();
 
     screen.run();
