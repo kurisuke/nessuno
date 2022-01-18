@@ -10,6 +10,7 @@ bdf-parser = "0.1.0"
 clap = { version = "3.0.9", features = ["derive"] }
 cpal = "0.13.4"
 crossbeam-channel = "0.5.1"
+gilrs = "0.8.2"
 pixels = "0.9.0"
 winit = "0.26.0"
 winit_input_helper = "0.11.0"

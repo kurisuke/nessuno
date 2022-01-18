@@ -1,3 +1,4 @@
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ControllerInput {
     A,
     B,

@@ -2,8 +2,8 @@ use clap::Parser;
 use crossbeam_channel::{bounded, Sender};
 use nessuno::audio;
 use nessuno::cartridge::Cartridge;
-use nessuno::controller::ControllerInput;
 use nessuno::cpu::{Disassembly, Flag};
+use nessuno::input::{InputGilrs, InputKeyboard};
 use nessuno::ppu::palette::PALETTE_2C02;
 use nessuno::ppu::SetPixel;
 use nessuno::screen::backend::{Frame, ScreenBackend};
@@ -62,6 +62,9 @@ struct Nessuno {
     render_params: VideoRenderParams,
 
     audio_send: Sender<f32>,
+
+    input_gilrs: InputGilrs,
+    input_keyboard: InputKeyboard,
 
     run: bool,
     t_residual: f64,
@@ -301,6 +304,8 @@ impl Nessuno {
                 scaling_factor: 2,
                 bytes_per_pixel: 4,
             },
+            input_gilrs: InputGilrs::new(),
+            input_keyboard: InputKeyboard::new(),
             audio_send,
             run: false,
             t_residual: 0f64,
@@ -416,6 +421,10 @@ impl ScreenBackend for Nessuno {
 
     fn update(&mut self, frame: Frame, dt: f64) {
         if self.run {
+            if let Some((input_c1, input_c2)) = self.input_gilrs.get() {
+                self.system.controller_update(&input_c1, &input_c2);
+            }
+
             while self.audio_send.len() < AUDIO_BUFFER_SIZE / 2 {
                 self.run_until_audio(frame.frame);
             }
@@ -454,32 +463,9 @@ impl ScreenBackend for Nessuno {
 
     fn handle_input(&mut self, input: &WinitInputHelper) {
         // CONTROLLER INPUT
-        let mut input_c1 = vec![];
-        if input.key_held(VirtualKeyCode::Left) {
-            input_c1.push(ControllerInput::Left);
+        if let Some((input_c1, input_c2)) = self.input_keyboard.get(input) {
+            self.system.controller_update(&input_c1, &input_c2);
         }
-        if input.key_held(VirtualKeyCode::Right) {
-            input_c1.push(ControllerInput::Right);
-        }
-        if input.key_held(VirtualKeyCode::Up) {
-            input_c1.push(ControllerInput::Up);
-        }
-        if input.key_held(VirtualKeyCode::Down) {
-            input_c1.push(ControllerInput::Down);
-        }
-        if input.key_held(VirtualKeyCode::Key1) {
-            input_c1.push(ControllerInput::B);
-        }
-        if input.key_held(VirtualKeyCode::Key2) {
-            input_c1.push(ControllerInput::A);
-        }
-        if input.key_held(VirtualKeyCode::Key3) {
-            input_c1.push(ControllerInput::Select);
-        }
-        if input.key_held(VirtualKeyCode::Key4) {
-            input_c1.push(ControllerInput::Start);
-        }
-        self.system.controller_update(&input_c1, &vec![]);
 
         // DEBUG KEYS
         if input.key_pressed(VirtualKeyCode::Space) {
@@ -507,7 +493,11 @@ struct NessunoMin {
     system: System,
     render_params: VideoRenderParams,
 
+    input_gilrs: InputGilrs,
+    input_keyboard: InputKeyboard,
+
     audio_send: Sender<f32>,
+
     run: bool,
     t_residual: f64,
 }
@@ -525,6 +515,8 @@ impl NessunoMin {
                 scaling_factor: 1,
                 bytes_per_pixel: 4,
             },
+            input_gilrs: InputGilrs::new(),
+            input_keyboard: InputKeyboard::new(),
             audio_send,
             run: true,
             t_residual: 0f64,
@@ -571,6 +563,10 @@ impl ScreenBackend for NessunoMin {
 
     fn update(&mut self, frame: Frame, dt: f64) {
         if self.run {
+            if let Some((input_c1, input_c2)) = self.input_gilrs.get() {
+                self.system.controller_update(&input_c1, &input_c2);
+            }
+
             while self.audio_send.len() < AUDIO_BUFFER_SIZE / 2 {
                 self.run_until_audio(frame.frame);
             }
@@ -586,32 +582,9 @@ impl ScreenBackend for NessunoMin {
 
     fn handle_input(&mut self, input: &WinitInputHelper) {
         // CONTROLLER INPUT
-        let mut input_c1 = vec![];
-        if input.key_held(VirtualKeyCode::Left) {
-            input_c1.push(ControllerInput::Left);
+        if let Some((input_c1, input_c2)) = self.input_keyboard.get(input) {
+            self.system.controller_update(&input_c1, &input_c2);
         }
-        if input.key_held(VirtualKeyCode::Right) {
-            input_c1.push(ControllerInput::Right);
-        }
-        if input.key_held(VirtualKeyCode::Up) {
-            input_c1.push(ControllerInput::Up);
-        }
-        if input.key_held(VirtualKeyCode::Down) {
-            input_c1.push(ControllerInput::Down);
-        }
-        if input.key_held(VirtualKeyCode::Key1) {
-            input_c1.push(ControllerInput::B);
-        }
-        if input.key_held(VirtualKeyCode::Key2) {
-            input_c1.push(ControllerInput::A);
-        }
-        if input.key_held(VirtualKeyCode::Key3) {
-            input_c1.push(ControllerInput::Select);
-        }
-        if input.key_held(VirtualKeyCode::Key4) {
-            input_c1.push(ControllerInput::Start);
-        }
-        self.system.controller_update(&input_c1, &vec![]);
 
         // DEBUG KEYS
         if input.key_pressed(VirtualKeyCode::Space) {
