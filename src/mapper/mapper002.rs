@@ -48,7 +48,7 @@ impl Mapper for Mapper002 {
     fn cpu_map_write(&mut self, addr: u16, data: u8) -> MapResult {
         match addr {
             0x8000..=0xffff => {
-                self.prg_bank_select_lo = (data & 0x0f) as usize;
+                self.prg_bank_select_lo = (data & 0x0f) as usize % self.num_banks_prg;
             }
             _ => {}
         }

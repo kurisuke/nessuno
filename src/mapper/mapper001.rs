@@ -100,35 +100,43 @@ impl Mapper for Mapper001 {
                             }
                             1 => {
                                 // set CHR Bank Lo
-                                if self.control_reg & 0x10 != 0 {
-                                    self.chr_bank_select_4_lo = self.load_reg as usize;
-                                } else {
-                                    self.chr_bank_select_8 = (self.load_reg >> 1) as usize;
+                                if self.num_banks_chr > 0 {
+                                    if self.control_reg & 0x10 != 0 {
+                                        self.chr_bank_select_4_lo =
+                                            self.load_reg as usize % (self.num_banks_chr << 1);
+                                    } else {
+                                        self.chr_bank_select_8 =
+                                            (self.load_reg >> 1) as usize % self.num_banks_chr;
+                                    }
                                 }
                             }
                             2 => {
                                 // set CHR Bank Hi
-                                if self.control_reg & 0x10 != 0 {
-                                    self.chr_bank_select_4_hi = self.load_reg as usize;
-                                } else {
-                                    // do nothing
+                                if self.num_banks_chr > 0 {
+                                    if self.control_reg & 0x10 != 0 {
+                                        self.chr_bank_select_4_hi =
+                                            self.load_reg as usize % (self.num_banks_chr << 1);
+                                    } else {
+                                        // do nothing
+                                    }
                                 }
                             }
                             3 => {
                                 // configure PRG banks
                                 match (self.control_reg >> 2) & 0x03 {
                                     0 | 1 => {
-                                        self.prg_bank_select_32 =
-                                            ((self.load_reg & 0x0e) >> 1) as usize;
+                                        self.prg_bank_select_32 = ((self.load_reg & 0x0e) >> 1)
+                                            as usize
+                                            % (self.num_banks_prg >> 1);
                                     }
                                     2 => {
                                         self.prg_bank_select_16_lo = 0;
                                         self.prg_bank_select_16_hi =
-                                            (self.load_reg & 0x0f) as usize;
+                                            (self.load_reg & 0x0f) as usize % self.num_banks_prg;
                                     }
                                     3 => {
                                         self.prg_bank_select_16_lo =
-                                            (self.load_reg & 0x0f) as usize;
+                                            (self.load_reg & 0x0f) as usize % self.num_banks_prg;
                                         self.prg_bank_select_16_hi = self.num_banks_prg - 1;
                                     }
                                     _ => unreachable!(),

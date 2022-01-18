@@ -2,13 +2,15 @@ use super::{MapResult, Mapper};
 
 pub struct Mapper003 {
     num_banks_prg: usize,
+    num_banks_chr: usize,
     chr_bank_select: usize,
 }
 
 impl Mapper003 {
-    pub fn new(num_banks_prg: usize, _num_banks_chr: usize) -> Mapper003 {
+    pub fn new(num_banks_prg: usize, num_banks_chr: usize) -> Mapper003 {
         Mapper003 {
             num_banks_prg,
+            num_banks_chr,
             chr_bank_select: 0,
         }
     }
@@ -35,7 +37,7 @@ impl Mapper for Mapper003 {
     fn cpu_map_write(&mut self, addr: u16, data: u8) -> MapResult {
         match addr {
             0x8000..=0xffff => {
-                self.chr_bank_select = (data & 0x03) as usize;
+                self.chr_bank_select = (data & 0x03) as usize % self.num_banks_chr;
             }
             _ => {}
         }

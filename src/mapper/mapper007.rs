@@ -2,14 +2,16 @@ use super::{MapResult, Mapper};
 use crate::cartridge::Mirror;
 
 pub struct Mapper007 {
+    num_banks_prg: usize,
     num_banks_chr: usize,
     prg_bank_select: usize,
     mirror_mode: Mirror,
 }
 
 impl Mapper007 {
-    pub fn new(_num_banks_prg: usize, num_banks_chr: usize) -> Mapper007 {
+    pub fn new(num_banks_prg: usize, num_banks_chr: usize) -> Mapper007 {
         Mapper007 {
+            num_banks_prg,
             num_banks_chr,
             prg_bank_select: 0,
             mirror_mode: Mirror::OneScreenLo,
@@ -34,7 +36,7 @@ impl Mapper for Mapper007 {
     fn cpu_map_write(&mut self, addr: u16, data: u8) -> MapResult {
         match addr {
             0x8000..=0xffff => {
-                self.prg_bank_select = (data & 0x07) as usize;
+                self.prg_bank_select = (data & 0x07) as usize % (self.num_banks_prg >> 1);
                 self.mirror_mode = if (data & 0x10) == 0 {
                     Mirror::OneScreenLo
                 } else {

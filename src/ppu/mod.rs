@@ -775,7 +775,7 @@ impl Ppu {
         pixel_value: u8,
     ) -> usize {
         let offset = 0x3f00 + ((palette as u16) << 2) + pixel_value as u16;
-        let color_idx = self.ppu_read(cart, offset);
+        let color_idx = self.ppu_read(cart, offset) & 0x3f;
         color_idx as usize
     }
 

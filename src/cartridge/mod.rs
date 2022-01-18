@@ -96,13 +96,13 @@ impl Cartridge {
                 unreachable!()
             }
             1 => {
-                let mut mem_prg = vec![0; num_banks_prg as usize * 16384];
+                let mut mem_prg = vec![0; num_banks_prg as usize * 0x4000];
                 reader.read_exact(&mut mem_prg)?;
 
                 let mem_chr = match num_banks_chr {
                     0 => vec![0; 8192],
                     _ => {
-                        let mut m = vec![0; num_banks_chr as usize * 8192];
+                        let mut m = vec![0; num_banks_chr as usize * 0x2000];
                         reader.read_exact(&mut m)?;
                         m
                     }

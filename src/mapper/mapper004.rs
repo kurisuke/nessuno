@@ -4,6 +4,7 @@ use crate::cartridge::Mirror;
 
 pub struct Mapper004 {
     num_banks_prg: usize,
+    num_banks_chr: usize,
 
     prg_ram: [u8; 8 * 1024],
     mirror_mode: Mirror,
@@ -23,9 +24,10 @@ pub struct Mapper004 {
 }
 
 impl Mapper004 {
-    pub fn new(num_banks_prg: usize, _num_banks_chr: usize) -> Mapper004 {
+    pub fn new(num_banks_prg: usize, num_banks_chr: usize) -> Mapper004 {
         Mapper004 {
             num_banks_prg,
+            num_banks_chr,
 
             prg_ram: [0; 8 * 1024],
             mirror_mode: Mirror::Horizontal,
@@ -82,7 +84,11 @@ impl Mapper for Mapper004 {
                     self.chr_inversion = data & 0x80 != 0;
                 } else {
                     // update mapping
-                    self.bank_reg[self.target_reg_idx] = data;
+                    self.bank_reg[self.target_reg_idx] = match self.target_reg_idx {
+                        0..=5 => data % ((self.num_banks_chr as u8) << 3),
+                        6..=7 => data % ((self.num_banks_prg as u8) << 1),
+                        _ => unreachable!(),
+                    };
 
                     if self.chr_inversion {
                         self.chr_bank_offset[0] = self.bank_reg[2] as usize * 0x0400;
