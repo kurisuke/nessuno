@@ -85,7 +85,7 @@ impl Mapper for Mapper004 {
                 } else {
                     // update mapping
                     self.bank_reg[self.target_reg_idx] = match self.target_reg_idx {
-                        0..=5 => data % ((self.num_banks_chr as u8) << 3),
+                        0..=5 => (data as u16 % ((self.num_banks_chr as u16) << 3)) as u8,
                         6..=7 => data % ((self.num_banks_prg as u8) << 1),
                         _ => unreachable!(),
                     };
