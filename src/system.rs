@@ -172,8 +172,8 @@ impl System {
         self.cpu.nmi(&mut self.bus);
     }
 
-    pub fn cpu_disassemble(&mut self, addr_start: u16, addr_stop: u16) -> Disassembly {
-        self.cpu.disassemble(&mut self.bus, addr_start, addr_stop)
+    pub fn cpu_disassemble(&self, addr_start: u16, addr_stop: u16) -> Disassembly {
+        self.cpu.disassemble(&self.bus, addr_start, addr_stop)
     }
 
     pub fn read(&self, addr: u16) -> u8 {

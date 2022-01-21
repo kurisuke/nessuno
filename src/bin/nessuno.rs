@@ -2,7 +2,7 @@ use clap::Parser;
 use crossbeam_channel::{bounded, Sender};
 use nessuno::audio;
 use nessuno::cartridge::Cartridge;
-use nessuno::cpu::{Disassembly, Flag};
+use nessuno::cpu::Flag;
 use nessuno::input::{InputGilrs, InputKeyboard};
 use nessuno::ppu::palette::PALETTE_2C02;
 use nessuno::ppu::SetPixel;
@@ -57,7 +57,6 @@ enum UserAction {
 
 struct Nessuno {
     system: System,
-    disasm: Disassembly,
     text_writer: TextWriter,
     render_params: VideoRenderParams,
 
@@ -165,21 +164,22 @@ impl Nessuno {
     }
 
     fn print_disasm(&self, frame: &mut [u8], addr: u16, pos_x: i32, pos_y: i32, range: usize) {
+        let addr_start = (addr as i32 - (range as i32 * 3)).max(0) as u16;
+        let addr_end = (addr as i32 + (range as i32 * 3)).min(0xffff) as u16;
+        let disasm = self.system.cpu_disassemble(addr_start, addr_end);
+
         // current position
         self.text_writer.write(
             frame,
             pos_x,
             pos_y + range as i32,
-            &format!(
-                "{:30}",
-                &self.disasm.get(&addr).unwrap_or(&String::from(""))
-            ),
+            &format!("{:30}", &disasm.get(&addr).unwrap_or(&String::from(""))),
             &HL_COLOR,
             &BG_COLOR,
         );
 
         // forward
-        let mut it_forward = self.disasm.range(addr..).skip(1);
+        let mut it_forward = disasm.range(addr..).skip(1);
         for i in 0..range {
             let line = if let Some((_, v)) = it_forward.next() {
                 v
@@ -197,7 +197,7 @@ impl Nessuno {
         }
 
         // backward
-        let mut it_backward = self.disasm.range(..addr);
+        let mut it_backward = disasm.range(..addr);
         for i in 0..range {
             let line = if let Some((_, v)) = it_backward.next_back() {
                 v
@@ -284,12 +284,8 @@ impl Nessuno {
     }
 
     fn new(cart: Cartridge, audio_send: Sender<f32>) -> Nessuno {
-        let mut system = System::new(cart, 44100);
-        let disasm = system.cpu_disassemble(0x0000, 0xffff);
-
         Nessuno {
-            system,
-            disasm,
+            system: System::new(cart, 44100),
             text_writer: TextWriter::new(
                 "res/cozette.bdf",
                 TextScreenParams {

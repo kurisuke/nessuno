@@ -754,12 +754,7 @@ impl Cpu {
         self.fetched
     }
 
-    pub fn disassemble<T: CpuBus>(
-        &mut self,
-        bus: &T,
-        addr_start: u16,
-        addr_stop: u16,
-    ) -> Disassembly {
+    pub fn disassemble<T: CpuBus>(&self, bus: &T, addr_start: u16, addr_stop: u16) -> Disassembly {
         let mut addr = addr_start as u32;
         let mut disasm = BTreeMap::new();
         while addr <= addr_stop as u32 {
