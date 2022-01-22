@@ -19,6 +19,12 @@ pub struct Cpu {
     addr_rel: u16,
 }
 
+impl Default for Cpu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Cpu {
     pub fn new() -> Cpu {
         Cpu {
@@ -71,34 +77,34 @@ impl Cpu {
     }
 
     fn addr_mode<T: CpuBus>(&mut self, bus: &mut T, addr_mode: &AddrMode) -> bool {
-        match addr_mode {
-            &AddrMode::Imp => {
+        match *addr_mode {
+            AddrMode::Imp => {
                 self.fetched = self.a;
                 false
             }
-            &AddrMode::Imm => {
+            AddrMode::Imm => {
                 self.addr_abs = self.pc;
                 self.pc += 1;
                 false
             }
-            &AddrMode::Zp0 => {
+            AddrMode::Zp0 => {
                 self.addr_abs = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 false
             }
-            &AddrMode::Zpx => {
+            AddrMode::Zpx => {
                 self.addr_abs = bus.cpu_read(self.pc) as u16 + self.x as u16;
                 self.addr_abs &= 0x00ff;
                 self.pc += 1;
                 false
             }
-            &AddrMode::Zpy => {
+            AddrMode::Zpy => {
                 self.addr_abs = bus.cpu_read(self.pc) as u16 + self.y as u16;
                 self.addr_abs &= 0x00ff;
                 self.pc += 1;
                 false
             }
-            &AddrMode::Rel => {
+            AddrMode::Rel => {
                 self.addr_rel = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 if self.addr_rel & 0x80 > 0 {
@@ -106,7 +112,7 @@ impl Cpu {
                 }
                 false
             }
-            &AddrMode::Abs => {
+            AddrMode::Abs => {
                 let lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 let hi = bus.cpu_read(self.pc) as u16;
@@ -116,7 +122,7 @@ impl Cpu {
 
                 false
             }
-            &AddrMode::Abx => {
+            AddrMode::Abx => {
                 let lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 let hi = bus.cpu_read(self.pc) as u16;
@@ -126,13 +132,9 @@ impl Cpu {
                 self.addr_abs += self.x as u16;
 
                 // if high byte has changed (page changed), need additional clock cycle
-                if (self.addr_abs & 0xff00) != (hi << 8) {
-                    true
-                } else {
-                    false
-                }
+                (self.addr_abs & 0xff00) != (hi << 8)
             }
-            &AddrMode::Aby => {
+            AddrMode::Aby => {
                 let lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 let hi = bus.cpu_read(self.pc) as u16;
@@ -142,13 +144,9 @@ impl Cpu {
                 self.addr_abs += self.y as u16;
 
                 // if high byte has changed (page changed), need additional clock cycle
-                if (self.addr_abs & 0xff00) != (hi << 8) {
-                    true
-                } else {
-                    false
-                }
+                (self.addr_abs & 0xff00) != (hi << 8)
             }
-            &AddrMode::Ind => {
+            AddrMode::Ind => {
                 let ptr_lo = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
                 let ptr_hi = bus.cpu_read(self.pc) as u16;
@@ -166,7 +164,7 @@ impl Cpu {
                 }
                 false
             }
-            &AddrMode::Izx => {
+            AddrMode::Izx => {
                 let t = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
@@ -177,7 +175,7 @@ impl Cpu {
 
                 false
             }
-            &AddrMode::Izy => {
+            AddrMode::Izy => {
                 let t = bus.cpu_read(self.pc) as u16;
                 self.pc += 1;
 
@@ -188,18 +186,14 @@ impl Cpu {
                 self.addr_abs += self.y as u16;
 
                 // if high byte has changed (page changed), need additional clock cycle
-                if (self.addr_abs & 0xff00) != (hi << 8) {
-                    true
-                } else {
-                    false
-                }
+                (self.addr_abs & 0xff00) != (hi << 8)
             }
         }
     }
 
     fn op<T: CpuBus>(&mut self, bus: &mut T, opcode: u8, instr: &Instr) -> bool {
-        match &instr.op {
-            &Op::Adc => {
+        match instr.op {
+            Op::Adc => {
                 // Add with Carry In
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = self.a as u16 + self.fetched as u16 + self.get_flag(Flag::C) as u16;
@@ -213,7 +207,7 @@ impl Cpu {
                 self.a = (tmp & 0x00ff) as u8;
                 true
             }
-            &Op::And => {
+            Op::And => {
                 // Bitwise Logical AND
                 self.fetch(bus, &instr.addr_mode);
                 self.a &= self.fetched;
@@ -221,7 +215,7 @@ impl Cpu {
                 self.set_flag(Flag::N, self.a & 0x80 != 0);
                 true
             }
-            &Op::Asl => {
+            Op::Asl => {
                 // Arithmetic shift left
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (self.fetched as u16) << 1;
@@ -237,28 +231,28 @@ impl Cpu {
 
                 false
             }
-            &Op::Bcc => {
+            Op::Bcc => {
                 // Branch if Carry Clear
                 if !self.get_flag(Flag::C) {
                     self.branch();
                 }
                 false
             }
-            &Op::Bcs => {
+            Op::Bcs => {
                 // Branch if Carry Set
                 if self.get_flag(Flag::C) {
                     self.branch();
                 }
                 false
             }
-            &Op::Beq => {
+            Op::Beq => {
                 // Branch if Equal
                 if self.get_flag(Flag::Z) {
                     self.branch();
                 }
                 false
             }
-            &Op::Bit => {
+            Op::Bit => {
                 // Bit testing ??
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = self.a & self.fetched;
@@ -267,28 +261,28 @@ impl Cpu {
                 self.set_flag(Flag::V, self.fetched & (1 << 6) != 0);
                 false
             }
-            &Op::Bmi => {
+            Op::Bmi => {
                 // Branch if Negative
                 if self.get_flag(Flag::N) {
                     self.branch();
                 }
                 false
             }
-            &Op::Bne => {
+            Op::Bne => {
                 // Branch if Not Equal
                 if !self.get_flag(Flag::Z) {
                     self.branch();
                 }
                 false
             }
-            &Op::Bpl => {
+            Op::Bpl => {
                 // Branch if Positive
                 if !self.get_flag(Flag::N) {
                     self.branch();
                 }
                 false
             }
-            &Op::Brk => {
+            Op::Brk => {
                 // Break (Program sourced interrupt)
                 self.pc += 1;
 
@@ -309,41 +303,41 @@ impl Cpu {
 
                 false
             }
-            &Op::Bvc => {
+            Op::Bvc => {
                 // Branch if Overflow Clear
                 if !self.get_flag(Flag::V) {
                     self.branch();
                 }
                 false
             }
-            &Op::Bvs => {
+            Op::Bvs => {
                 // Branch if Overflow Set
                 if self.get_flag(Flag::V) {
                     self.branch();
                 }
                 false
             }
-            &Op::Clc => {
+            Op::Clc => {
                 // Clear Carry Flag
                 self.set_flag(Flag::C, false);
                 false
             }
-            &Op::Cld => {
+            Op::Cld => {
                 // Clear Decimal Flag
                 self.set_flag(Flag::D, false);
                 false
             }
-            &Op::Cli => {
+            Op::Cli => {
                 // Disable Interrupts / Clear Interrupt Flag
                 self.set_flag(Flag::I, false);
                 false
             }
-            &Op::Clv => {
+            Op::Clv => {
                 // Clear Overflow Flag
                 self.set_flag(Flag::V, false);
                 false
             }
-            &Op::Cmp => {
+            Op::Cmp => {
                 // Compare Accumulator
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (Wrapping(self.a as u16) - Wrapping(self.fetched as u16)).0;
@@ -352,7 +346,7 @@ impl Cpu {
                 self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 true
             }
-            &Op::Cpx => {
+            Op::Cpx => {
                 // Compare X register
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (Wrapping(self.x as u16) - Wrapping(self.fetched as u16)).0;
@@ -361,7 +355,7 @@ impl Cpu {
                 self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 false
             }
-            &Op::Cpy => {
+            Op::Cpy => {
                 // Compare Y register
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (Wrapping(self.y as u16) - Wrapping(self.fetched as u16)).0;
@@ -370,30 +364,30 @@ impl Cpu {
                 self.set_flag(Flag::N, tmp & 0x0080 != 0);
                 false
             }
-            &Op::Dec => {
+            Op::Dec => {
                 // Decrement Value at Memory Location
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (Wrapping(self.fetched) - Wrapping(1)).0;
-                bus.cpu_write(self.addr_abs, (tmp & 0x00ff) as u8);
-                self.set_flag(Flag::Z, tmp & 0x00ff == 0);
-                self.set_flag(Flag::N, tmp & 0x0080 != 0);
+                bus.cpu_write(self.addr_abs, tmp);
+                self.set_flag(Flag::Z, tmp == 0);
+                self.set_flag(Flag::N, tmp & 0x80 != 0);
                 false
             }
-            &Op::Dex => {
+            Op::Dex => {
                 // Decrement X Register
                 self.x = (Wrapping(self.x) - Wrapping(1)).0;
-                self.set_flag(Flag::Z, self.x & 0x00ff == 0);
-                self.set_flag(Flag::N, self.x & 0x0080 != 0);
+                self.set_flag(Flag::Z, self.x == 0);
+                self.set_flag(Flag::N, self.x & 0x80 != 0);
                 false
             }
-            &Op::Dey => {
+            Op::Dey => {
                 // Decrement Y Register
                 self.y = (Wrapping(self.y) - Wrapping(1)).0;
-                self.set_flag(Flag::Z, self.y & 0x00ff == 0);
-                self.set_flag(Flag::N, self.y & 0x0080 != 0);
+                self.set_flag(Flag::Z, self.y == 0);
+                self.set_flag(Flag::N, self.y & 0x80 != 0);
                 false
             }
-            &Op::Eor => {
+            Op::Eor => {
                 // Bitwise Logical AND
                 self.fetch(bus, &instr.addr_mode);
                 self.a ^= self.fetched;
@@ -401,35 +395,35 @@ impl Cpu {
                 self.set_flag(Flag::N, self.a & 0x80 != 0);
                 true
             }
-            &Op::Inc => {
+            Op::Inc => {
                 // Increment Value at Memory Location
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = (Wrapping(self.fetched) + Wrapping(1)).0;
-                bus.cpu_write(self.addr_abs, (tmp & 0x00ff) as u8);
-                self.set_flag(Flag::Z, tmp & 0x00ff == 0);
-                self.set_flag(Flag::N, tmp & 0x0080 != 0);
+                bus.cpu_write(self.addr_abs, tmp);
+                self.set_flag(Flag::Z, tmp == 0);
+                self.set_flag(Flag::N, tmp & 0x80 != 0);
                 false
             }
-            &Op::Inx => {
+            Op::Inx => {
                 // Increment X Register
                 self.x = (Wrapping(self.x) + Wrapping(1)).0;
-                self.set_flag(Flag::Z, self.x & 0x00ff == 0);
-                self.set_flag(Flag::N, self.x & 0x0080 != 0);
+                self.set_flag(Flag::Z, self.x == 0);
+                self.set_flag(Flag::N, self.x & 0x80 != 0);
                 false
             }
-            &Op::Iny => {
+            Op::Iny => {
                 // Increment Y Register
                 self.y = (Wrapping(self.y) + Wrapping(1)).0;
-                self.set_flag(Flag::Z, self.y & 0x00ff == 0);
-                self.set_flag(Flag::N, self.y & 0x0080 != 0);
+                self.set_flag(Flag::Z, self.y == 0);
+                self.set_flag(Flag::N, self.y & 0x80 != 0);
                 false
             }
-            &Op::Jmp => {
+            Op::Jmp => {
                 // Jump To Location
                 self.pc = self.addr_abs;
                 false
             }
-            &Op::Jsr => {
+            Op::Jsr => {
                 // Jump To Sub-Routine
                 self.pc -= 1;
 
@@ -441,31 +435,31 @@ impl Cpu {
                 self.pc = self.addr_abs;
                 false
             }
-            &Op::Lda => {
+            Op::Lda => {
                 // Load Accumulator
                 self.fetch(bus, &instr.addr_mode);
                 self.a = self.fetched;
-                self.set_flag(Flag::Z, self.a & 0x00ff == 0);
-                self.set_flag(Flag::N, self.a & 0x0080 != 0);
+                self.set_flag(Flag::Z, self.a == 0);
+                self.set_flag(Flag::N, self.a & 0x80 != 0);
                 true
             }
-            &Op::Ldx => {
+            Op::Ldx => {
                 // Load X Register
                 self.fetch(bus, &instr.addr_mode);
                 self.x = self.fetched;
-                self.set_flag(Flag::Z, self.x & 0x00ff == 0);
-                self.set_flag(Flag::N, self.x & 0x0080 != 0);
+                self.set_flag(Flag::Z, self.x == 0);
+                self.set_flag(Flag::N, self.x & 0x80 != 0);
                 true
             }
-            &Op::Ldy => {
+            Op::Ldy => {
                 // Load Y Register
                 self.fetch(bus, &instr.addr_mode);
                 self.y = self.fetched;
-                self.set_flag(Flag::Z, self.y & 0x00ff == 0);
-                self.set_flag(Flag::N, self.y & 0x0080 != 0);
+                self.set_flag(Flag::Z, self.y == 0);
+                self.set_flag(Flag::N, self.y & 0x80 != 0);
                 true
             }
-            &Op::Lsr => {
+            Op::Lsr => {
                 // Logical Shift Right
                 self.fetch(bus, &instr.addr_mode);
 
@@ -484,15 +478,12 @@ impl Cpu {
                 }
                 false
             }
-            &Op::Nop => {
+            Op::Nop => {
                 // No Operation
-                // NOP variants differ by cycle length
-                match opcode {
-                    0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc => true,
-                    _ => false,
-                }
+                // some NOP variants add additional cycle
+                matches!(opcode, 0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc)
             }
-            &Op::Ora => {
+            Op::Ora => {
                 // Bitwise Logical OR
                 self.fetch(bus, &instr.addr_mode);
                 self.a |= self.fetched;
@@ -500,13 +491,13 @@ impl Cpu {
                 self.set_flag(Flag::N, self.a & 0x80 != 0);
                 true
             }
-            &Op::Pha => {
+            Op::Pha => {
                 // Push Accumulator to Stack
                 bus.cpu_write(0x0100 + self.stkp as u16, self.a);
                 self.stkp -= 1;
                 false
             }
-            &Op::Php => {
+            Op::Php => {
                 // Push Status Register to Stack
                 bus.cpu_write(
                     0x0100 + self.stkp as u16,
@@ -517,7 +508,7 @@ impl Cpu {
                 self.stkp -= 1;
                 false
             }
-            &Op::Pla => {
+            Op::Pla => {
                 // Pop Accumulator off Stack
                 self.stkp += 1;
                 self.a = bus.cpu_read(0x0100 + self.stkp as u16);
@@ -525,14 +516,14 @@ impl Cpu {
                 self.set_flag(Flag::N, self.a & 0x80 != 0);
                 false
             }
-            &Op::Plp => {
+            Op::Plp => {
                 // Pop Status Register off Stack
                 self.stkp += 1;
                 self.status = bus.cpu_read(0x0100 + self.stkp as u16);
                 self.set_flag(Flag::U, true);
                 false
             }
-            &Op::Rol => {
+            Op::Rol => {
                 // Rotate Left
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = ((self.fetched as u16) << 1) | (self.get_flag(Flag::C) as u16);
@@ -546,7 +537,7 @@ impl Cpu {
                 }
                 false
             }
-            &Op::Ror => {
+            Op::Ror => {
                 // Rotate Right
                 self.fetch(bus, &instr.addr_mode);
                 let tmp = ((self.fetched as u16) >> 1) | ((self.get_flag(Flag::C) as u16) << 7);
@@ -560,7 +551,7 @@ impl Cpu {
                 }
                 false
             }
-            &Op::Rti => {
+            Op::Rti => {
                 // Return from Interrupt
                 self.stkp += 1;
                 self.status = bus.cpu_read(0x0100 + self.stkp as u16);
@@ -573,7 +564,7 @@ impl Cpu {
                 self.pc |= (bus.cpu_read(0x100 + self.stkp as u16) as u16) << 8;
                 false
             }
-            &Op::Rts => {
+            Op::Rts => {
                 // Return from Subroutine
                 self.stkp += 1;
                 self.pc = bus.cpu_read(0x100 + self.stkp as u16) as u16;
@@ -583,7 +574,7 @@ impl Cpu {
                 self.pc += 1;
                 false
             }
-            &Op::Sbc => {
+            Op::Sbc => {
                 // Substract With Carry
                 self.fetch(bus, &instr.addr_mode);
 
@@ -600,77 +591,77 @@ impl Cpu {
                 self.a = tmp as u8;
                 true
             }
-            &Op::Sec => {
+            Op::Sec => {
                 // Set Carry Flag
                 self.set_flag(Flag::C, true);
                 false
             }
-            &Op::Sed => {
+            Op::Sed => {
                 // Set Decimal Flag
                 self.set_flag(Flag::D, true);
                 false
             }
-            &Op::Sei => {
+            Op::Sei => {
                 // Set Interrupt Flag / Enable Interrupts
                 self.set_flag(Flag::I, true);
                 false
             }
-            &Op::Sta => {
+            Op::Sta => {
                 // Store Accumulator at Address
                 bus.cpu_write(self.addr_abs, self.a);
                 false
             }
-            &Op::Stx => {
+            Op::Stx => {
                 // Store X Register at Address
                 bus.cpu_write(self.addr_abs, self.x);
                 false
             }
-            &Op::Sty => {
+            Op::Sty => {
                 // Store Y Register at Address
                 bus.cpu_write(self.addr_abs, self.y);
                 false
             }
-            &Op::Tax => {
+            Op::Tax => {
                 // Transfer Accumulator to X Register
                 self.x = self.a;
                 self.set_flag(Flag::Z, self.x == 0);
                 self.set_flag(Flag::N, self.x & 0x80 != 0);
                 false
             }
-            &Op::Tay => {
+            Op::Tay => {
                 // Transfer Accumulator to Y Register
                 self.y = self.a;
                 self.set_flag(Flag::Z, self.y == 0);
                 self.set_flag(Flag::N, self.y & 0x80 != 0);
                 false
             }
-            &Op::Tsx => {
+            Op::Tsx => {
                 // Transfer Stack Pointer to X Register
                 self.x = self.stkp;
                 self.set_flag(Flag::Z, self.x == 0);
                 self.set_flag(Flag::N, self.x & 0x80 != 0);
                 false
             }
-            &Op::Txa => {
+            Op::Txa => {
                 // Transfer X Register to Accumulator
                 self.a = self.x;
                 self.set_flag(Flag::Z, self.a == 0);
                 self.set_flag(Flag::N, self.a & 0x80 != 0);
                 false
             }
-            &Op::Txs => {
+            Op::Txs => {
                 // Transfer X Register to Stack Pointer
                 self.stkp = self.x;
                 false
             }
-            &Op::Tya => {
+            Op::Tya => {
                 // Transfer Y Register to Accumulator
                 self.a = self.y;
                 self.set_flag(Flag::Z, self.a == 0);
                 self.set_flag(Flag::N, self.a & 0x80 != 0);
                 false
             }
-            &Op::Xxx => false, // ignore
+            Op::Xxx => false, // ignore
         }
     }
 
@@ -690,7 +681,7 @@ impl Cpu {
         self.x = 0x00;
         self.y = 0x00;
         self.stkp = 0xfd;
-        self.status = 0x00 | Flag::U.mask();
+        self.status = Flag::U.mask();
 
         self.addr_abs = 0xfffc;
         let lo = bus.cpu_read(self.addr_abs) as u16;
