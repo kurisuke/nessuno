@@ -284,7 +284,7 @@ impl Nessuno {
         Nessuno {
             system: System::new(cart, 44100),
             text_writer: TextWriter::new(
-                "res/cozette.bdf",
+                include_bytes!("../../res/cozette.bdf"),
                 TextScreenParams {
                     width: SCREEN_WIDTH as usize,
                     height: SCREEN_HEIGHT as usize,

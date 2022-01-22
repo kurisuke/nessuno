@@ -1,5 +1,4 @@
 use bdf_parser::{BdfFont, Property};
-use std::fs;
 
 pub struct TextWriter {
     font: BdfFont,
@@ -19,8 +18,8 @@ struct FontParams {
 }
 
 impl TextWriter {
-    pub fn new(font_file: &str, screen_params: TextScreenParams) -> TextWriter {
-        let font = BdfFont::parse(&fs::read(font_file).unwrap()).unwrap();
+    pub fn new(font_input: &[u8], screen_params: TextScreenParams) -> TextWriter {
+        let font = BdfFont::parse(font_input).unwrap();
         let font_params = FontParams {
             char_size_x: font.properties.try_get::<i32>(Property::NormSpace).unwrap() + 1,
             char_size_y: font.properties.try_get::<i32>(Property::PixelSize).unwrap() + 1,
