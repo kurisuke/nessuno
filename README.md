@@ -17,7 +17,15 @@ Using [Cozette](https://github.com/slavfox/Cozette/) bitmap font for UI text.
 - Mappers: 000, 001, 002, 003, 004, 007
 - Input: keyboard, fixed mapping, 1 controller only
 
-## Build & Run
+## Build
+
+Non-Rust build dependencies (Debian/Ubuntu):
+
+```
+sudo apt install libasound2-dev libudev-dev
+```
+
+Build & run:
 
 ```
 cargo run --release --bin nessuno romname.nes
