@@ -34,16 +34,13 @@ impl Mapper for Mapper007 {
     }
 
     fn cpu_map_write(&mut self, addr: u16, data: u8) -> MapResult {
-        match addr {
-            0x8000..=0xffff => {
-                self.prg_bank_select = (data & 0x07) as usize % (self.num_banks_prg >> 1);
-                self.mirror_mode = if (data & 0x10) == 0 {
-                    Mirror::OneScreenLo
-                } else {
-                    Mirror::OneScreenHi
-                };
-            }
-            _ => {}
+        if let 0x8000..=0xffff = addr {
+            self.prg_bank_select = (data & 0x07) as usize % (self.num_banks_prg >> 1);
+            self.mirror_mode = if (data & 0x10) == 0 {
+                Mirror::OneScreenLo
+            } else {
+                Mirror::OneScreenHi
+            };
         }
         MapResult::None
     }

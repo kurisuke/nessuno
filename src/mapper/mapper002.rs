@@ -46,11 +46,8 @@ impl Mapper for Mapper002 {
     }
 
     fn cpu_map_write(&mut self, addr: u16, data: u8) -> MapResult {
-        match addr {
-            0x8000..=0xffff => {
-                self.prg_bank_select_lo = (data & 0x0f) as usize % self.num_banks_prg;
-            }
-            _ => {}
+        if let 0x8000..=0xffff = addr {
+            self.prg_bank_select_lo = (data & 0x0f) as usize % self.num_banks_prg;
         }
         MapResult::None
     }
