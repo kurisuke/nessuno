@@ -9,6 +9,12 @@ pub struct InputGilrs {
     pushed_buttons: HashSet<ControllerInput>,
 }
 
+impl Default for InputGilrs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InputGilrs {
     pub fn new() -> InputGilrs {
         InputGilrs {
@@ -65,6 +71,12 @@ fn map_button(button: &Button) -> Option<ControllerInput> {
 
 pub struct InputKeyboard {
     pushed_buttons: HashSet<ControllerInput>,
+}
+
+impl Default for InputKeyboard {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InputKeyboard {
