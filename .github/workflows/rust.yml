@@ -1,0 +1,50 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    # make sure all code has been formatted with rustfmt
+    - run: rustup component add rustfmt
+    - name: check rustfmt
+      run: cargo fmt -- --check --color always
+
+    # run clippy to verify we have no warnings
+    - run: rustup component add clippy
+    - run: cargo fetch
+    - name: cargo clippy
+      run: cargo clippy --all-targets
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - run: cargo fetch
+    - name: cargo test build
+      run: cargo build --tests --release
+    - name: cargo test
+      run: cargo test --release
