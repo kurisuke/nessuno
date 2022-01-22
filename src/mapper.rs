@@ -4,6 +4,7 @@ pub mod mapper002;
 pub mod mapper003;
 pub mod mapper004;
 pub mod mapper007;
+pub mod mapper009;
 
 use crate::cartridge::Mirror;
 
