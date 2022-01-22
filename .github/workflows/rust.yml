@@ -19,15 +19,19 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
+        components: rustfmt, clippy
         override: true
 
+    - name: install alsa dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install libasound2-dev
+
     # make sure all code has been formatted with rustfmt
-    - run: rustup component add rustfmt
     - name: check rustfmt
       run: cargo fmt -- --check --color always
 
-    # run clippy to verify we have no warnings
-    - run: rustup component add clippy
+    # run clippy
     - run: cargo fetch
     - name: cargo clippy
       run: cargo clippy --all-targets
@@ -42,6 +46,11 @@ jobs:
       with:
         toolchain: stable
         override: true
+
+    - name: install alsa dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install libasound2-dev
 
     - run: cargo fetch
     - name: cargo test build
