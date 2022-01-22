@@ -215,17 +215,17 @@ impl ScreenBackend for DebugCpu {
 
     fn update(&mut self, _frame: Frame, _dt: f64) {
         if let Some(action) = &self.action {
-            match action {
-                &UserAction::Reset => {
+            match *action {
+                UserAction::Reset => {
                     self.system.cpu_reset();
                 }
-                &UserAction::Irq => {
+                UserAction::Irq => {
                     self.system.cpu_irq();
                 }
-                &UserAction::Nmi => {
+                UserAction::Nmi => {
                     self.system.cpu_nmi();
                 }
-                &UserAction::Step => {
+                UserAction::Step => {
                     self.system.cpu_step();
                 }
                 _ => {}

@@ -6,6 +6,12 @@ pub struct SystemDebugCpu {
     pub cpu: Cpu,
 }
 
+impl Default for SystemDebugCpu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SystemDebugCpu {
     pub fn new() -> SystemDebugCpu {
         SystemDebugCpu {
@@ -46,9 +52,8 @@ impl SystemDebugCpu {
         self.cpu.nmi(&mut self.memory);
     }
 
-    pub fn cpu_disassemble(&mut self, addr_start: u16, addr_stop: u16) -> Disassembly {
-        self.cpu
-            .disassemble(&mut self.memory, addr_start, addr_stop)
+    pub fn cpu_disassemble(&self, addr_start: u16, addr_stop: u16) -> Disassembly {
+        self.cpu.disassemble(&self.memory, addr_start, addr_stop)
     }
 
     pub fn read(&self, addr: u16) -> u8 {

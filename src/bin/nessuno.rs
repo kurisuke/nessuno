@@ -230,10 +230,7 @@ impl Nessuno {
 
         for palette in 0..8 {
             for pixel_value in 0..4 {
-                let color = self
-                    .system
-                    .ppu_get_color_from_palette(palette, pixel_value)
-                    .clone();
+                let color = self.system.ppu_get_color_from_palette(palette, pixel_value);
                 self.fill_rect(
                     frame,
                     572 + palette * 40 + pixel_value as usize * 8,
@@ -430,30 +427,30 @@ impl ScreenBackend for Nessuno {
             } else {
                 self.t_residual += FRAME_DURATION - dt;
                 self.frame(frame.frame, false, true);
+                self.draw_ppu_data(frame.frame);
                 self.paint = true;
             }
-        } else {
-            if let Some(action) = &self.action {
-                match *action {
-                    UserAction::Reset => {
-                        self.system.reset();
-                        self.draw_ppu_data(frame.frame);
-                    }
-                    UserAction::Step => {
-                        self.step(frame.frame);
-                    }
-                    UserAction::Frame => {
-                        self.frame(frame.frame, true, false);
-                    }
-                    UserAction::PaletteSelect => {
-                        self.draw_ppu_data(frame.frame);
-                    }
+        } else if let Some(action) = &self.action {
+            match *action {
+                UserAction::Reset => {
+                    self.system.reset();
+                    self.draw_ppu_data(frame.frame);
                 }
-                self.action = None;
-                self.paint = true;
-            } else {
-                self.paint = false;
+                UserAction::Step => {
+                    self.step(frame.frame);
+                }
+                UserAction::Frame => {
+                    self.frame(frame.frame, true, false);
+                    self.draw_ppu_data(frame.frame);
+                }
+                UserAction::PaletteSelect => {
+                    self.draw_ppu_data(frame.frame);
+                }
             }
+            self.action = None;
+            self.paint = true;
+        } else {
+            self.paint = false;
         }
     }
 
