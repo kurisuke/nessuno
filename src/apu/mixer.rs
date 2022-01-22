@@ -9,13 +9,13 @@ pub struct Mixer {
 impl Mixer {
     pub fn new() -> Mixer {
         let mut lut_pulse = [0f32; LUT_PULSE_LEN];
-        for i in 0..LUT_PULSE_LEN {
-            lut_pulse[i] = 2.0 * 95.52 / (8128.0 / (i as f32) + 100.0) - 0.5;
+        for (i, e) in lut_pulse.iter_mut().enumerate() {
+            *e = 2.0 * 95.52 / (8128.0 / (i as f32) + 100.0) - 0.5;
         }
 
         let mut lut_tnd = [0f32; LUT_TND_LEN];
-        for i in 0..LUT_TND_LEN {
-            lut_tnd[i] = 2.0 * 163.67 / (24329.0 / (i as f32) + 100.0) - 0.5;
+        for (i, e) in lut_tnd.iter_mut().enumerate() {
+            *e = 2.0 * 163.67 / (24329.0 / (i as f32) + 100.0) - 0.5;
         }
 
         Mixer { lut_pulse, lut_tnd }
