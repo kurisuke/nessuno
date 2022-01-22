@@ -27,7 +27,7 @@ struct Bus {
     dma_addr: u8,
     dma_data: u8,
     dma_transfer: bool,
-    dma_dummy: bool,
+    dma_start_wait: bool,
 }
 
 pub struct SystemClockResult {
@@ -52,7 +52,7 @@ impl System {
                 dma_addr: 0x00,
                 dma_data: 0x00,
                 dma_transfer: false,
-                dma_dummy: true,
+                dma_start_wait: true,
             },
             clock_counter: 0,
             time_per_sample: 1f64 / (sample_rate as f64),
@@ -75,26 +75,25 @@ impl System {
 
         if self.clock_counter % 3 == 0 {
             if self.bus.dma_transfer {
-                if self.bus.dma_dummy {
+                if self.bus.dma_start_wait {
+                    // wait for start: after first odd cycle
                     if self.clock_counter % 2 == 1 {
-                        self.bus.dma_dummy = false;
+                        self.bus.dma_start_wait = false;
                     }
+                } else if self.clock_counter % 2 == 0 {
+                    // even cycle: read from cpu
+                    self.bus.dma_data = self
+                        .bus
+                        .cpu_read(((self.bus.dma_page as u16) << 8) | (self.bus.dma_addr as u16));
                 } else {
-                    if self.clock_counter % 2 == 0 {
-                        // even cycle: read from cpu
-                        self.bus.dma_data = self.bus.cpu_read(
-                            ((self.bus.dma_page as u16) << 8) | (self.bus.dma_addr as u16),
-                        );
+                    // odd cycle: write to ppu
+                    self.bus.ppu.write_oam(self.bus.dma_addr, self.bus.dma_data);
+                    if self.bus.dma_addr == 255 {
+                        self.bus.dma_addr = 0;
+                        self.bus.dma_transfer = false;
+                        self.bus.dma_start_wait = true;
                     } else {
-                        // odd cycle: write to ppu
-                        self.bus.ppu.write_oam(self.bus.dma_addr, self.bus.dma_data);
-                        if self.bus.dma_addr == 255 {
-                            self.bus.dma_addr = 0;
-                            self.bus.dma_transfer = false;
-                            self.bus.dma_dummy = true;
-                        } else {
-                            self.bus.dma_addr += 1;
-                        }
+                        self.bus.dma_addr += 1;
                     }
                 }
             } else {

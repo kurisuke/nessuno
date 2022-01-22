@@ -156,20 +156,18 @@ impl Envelope {
             self.decay_level = 15;
             self.divider = self.volume;
             self.flag_start = false;
-        } else {
-            if self.divider == 0 {
-                self.divider = self.volume;
+        } else if self.divider == 0 {
+            self.divider = self.volume;
 
-                if self.decay_level == 0 {
-                    if self.flag_loop {
-                        self.decay_level = 15;
-                    }
-                } else {
-                    self.decay_level -= 1;
+            if self.decay_level == 0 {
+                if self.flag_loop {
+                    self.decay_level = 15;
                 }
             } else {
-                self.divider -= 1;
+                self.decay_level -= 1;
             }
+        } else {
+            self.divider -= 1;
         }
     }
 

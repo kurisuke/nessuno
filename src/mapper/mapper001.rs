@@ -79,77 +79,75 @@ impl Mapper for Mapper001 {
                     // reset serial loading
                     self.load_reg = 0x10;
                     self.control_reg |= 0x0c;
-                } else {
-                    if self.load_reg & 0x01 != 0 {
-                        // register is full
-                        self.load_reg >>= 1;
-                        self.load_reg |= (data & 0x01) << 4;
+                } else if self.load_reg & 0x01 != 0 {
+                    // register is full
+                    self.load_reg >>= 1;
+                    self.load_reg |= (data & 0x01) << 4;
 
-                        let target = (addr >> 13) & 0x03;
-                        match target {
-                            0 => {
-                                // set Control Register
-                                self.control_reg = self.load_reg;
-                                self.mirror_mode = match self.control_reg & 0x03 {
-                                    0 => Mirror::OneScreenLo,
-                                    1 => Mirror::OneScreenHi,
-                                    2 => Mirror::Vertical,
-                                    3 => Mirror::Horizontal,
-                                    _ => unreachable!(),
-                                };
-                            }
-                            1 => {
-                                // set CHR Bank Lo
-                                if self.num_banks_chr > 0 {
-                                    if self.control_reg & 0x10 != 0 {
-                                        self.chr_bank_select_4_lo =
-                                            self.load_reg as usize % (self.num_banks_chr << 1);
-                                    } else {
-                                        self.chr_bank_select_8 =
-                                            (self.load_reg >> 1) as usize % self.num_banks_chr;
-                                    }
-                                }
-                            }
-                            2 => {
-                                // set CHR Bank Hi
-                                if self.num_banks_chr > 0 {
-                                    if self.control_reg & 0x10 != 0 {
-                                        self.chr_bank_select_4_hi =
-                                            self.load_reg as usize % (self.num_banks_chr << 1);
-                                    } else {
-                                        // do nothing
-                                    }
-                                }
-                            }
-                            3 => {
-                                // configure PRG banks
-                                match (self.control_reg >> 2) & 0x03 {
-                                    0 | 1 => {
-                                        self.prg_bank_select_32 = ((self.load_reg & 0x0e) >> 1)
-                                            as usize
-                                            % (self.num_banks_prg >> 1);
-                                    }
-                                    2 => {
-                                        self.prg_bank_select_16_lo = 0;
-                                        self.prg_bank_select_16_hi =
-                                            (self.load_reg & 0x0f) as usize % self.num_banks_prg;
-                                    }
-                                    3 => {
-                                        self.prg_bank_select_16_lo =
-                                            (self.load_reg & 0x0f) as usize % self.num_banks_prg;
-                                        self.prg_bank_select_16_hi = self.num_banks_prg - 1;
-                                    }
-                                    _ => unreachable!(),
-                                }
-                            }
-                            _ => unreachable!(),
+                    let target = (addr >> 13) & 0x03;
+                    match target {
+                        0 => {
+                            // set Control Register
+                            self.control_reg = self.load_reg;
+                            self.mirror_mode = match self.control_reg & 0x03 {
+                                0 => Mirror::OneScreenLo,
+                                1 => Mirror::OneScreenHi,
+                                2 => Mirror::Vertical,
+                                3 => Mirror::Horizontal,
+                                _ => unreachable!(),
+                            };
                         }
-                        // reset load register
-                        self.load_reg = 0x10;
-                    } else {
-                        self.load_reg >>= 1;
-                        self.load_reg |= (data & 0x01) << 4;
+                        1 => {
+                            // set CHR Bank Lo
+                            if self.num_banks_chr > 0 {
+                                if self.control_reg & 0x10 != 0 {
+                                    self.chr_bank_select_4_lo =
+                                        self.load_reg as usize % (self.num_banks_chr << 1);
+                                } else {
+                                    self.chr_bank_select_8 =
+                                        (self.load_reg >> 1) as usize % self.num_banks_chr;
+                                }
+                            }
+                        }
+                        2 => {
+                            // set CHR Bank Hi
+                            if self.num_banks_chr > 0 {
+                                if self.control_reg & 0x10 != 0 {
+                                    self.chr_bank_select_4_hi =
+                                        self.load_reg as usize % (self.num_banks_chr << 1);
+                                } else {
+                                    // do nothing
+                                }
+                            }
+                        }
+                        3 => {
+                            // configure PRG banks
+                            match (self.control_reg >> 2) & 0x03 {
+                                0 | 1 => {
+                                    self.prg_bank_select_32 = ((self.load_reg & 0x0e) >> 1)
+                                        as usize
+                                        % (self.num_banks_prg >> 1);
+                                }
+                                2 => {
+                                    self.prg_bank_select_16_lo = 0;
+                                    self.prg_bank_select_16_hi =
+                                        (self.load_reg & 0x0f) as usize % self.num_banks_prg;
+                                }
+                                3 => {
+                                    self.prg_bank_select_16_lo =
+                                        (self.load_reg & 0x0f) as usize % self.num_banks_prg;
+                                    self.prg_bank_select_16_hi = self.num_banks_prg - 1;
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        _ => unreachable!(),
                     }
+                    // reset load register
+                    self.load_reg = 0x10;
+                } else {
+                    self.load_reg >>= 1;
+                    self.load_reg |= (data & 0x01) << 4;
                 }
                 MapResult::DirectWrite
             }
@@ -162,22 +160,20 @@ impl Mapper for Mapper001 {
             0x0000..=0x1fff => {
                 if self.num_banks_chr == 0 {
                     MapResult::MapAddr(addr as usize)
-                } else {
-                    if self.control_reg & 0x10 != 0 {
-                        // 4K mode
-                        match addr {
-                            0x0000..=0x0fff => MapResult::MapAddr(
-                                self.chr_bank_select_4_lo * 0x1000 + addr as usize,
-                            ),
-                            0x1000..=0x1fff => MapResult::MapAddr(
-                                self.chr_bank_select_4_hi * 0x1000 + (addr & 0x0fff) as usize,
-                            ),
-                            _ => unreachable!(),
+                } else if self.control_reg & 0x10 != 0 {
+                    // 4K mode
+                    match addr {
+                        0x0000..=0x0fff => {
+                            MapResult::MapAddr(self.chr_bank_select_4_lo * 0x1000 + addr as usize)
                         }
-                    } else {
-                        // 8K mode
-                        MapResult::MapAddr(self.chr_bank_select_8 * 0x2000 + addr as usize)
+                        0x1000..=0x1fff => MapResult::MapAddr(
+                            self.chr_bank_select_4_hi * 0x1000 + (addr & 0x0fff) as usize,
+                        ),
+                        _ => unreachable!(),
                     }
+                } else {
+                    // 8K mode
+                    MapResult::MapAddr(self.chr_bank_select_8 * 0x2000 + addr as usize)
                 }
             }
             _ => MapResult::None,

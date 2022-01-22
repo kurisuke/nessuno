@@ -435,16 +435,16 @@ impl Ppu {
                     && self.mask.get_flag(MaskRegFlag::RenderBg)
                     && self.mask.get_flag(MaskRegFlag::RenderSprites)
                 {
-                    if !(self.mask.get_flag(MaskRegFlag::RenderBgLeft)
-                        || self.mask.get_flag(MaskRegFlag::RenderSpritesLeft))
+                    let min_cycle = if self.mask.get_flag(MaskRegFlag::RenderBgLeft)
+                        || self.mask.get_flag(MaskRegFlag::RenderSpritesLeft)
                     {
-                        if self.cycle >= 9 && self.cycle < 258 {
-                            self.status.set_flag(StatusRegFlag::SpriteZeroHit, true);
-                        }
+                        1
                     } else {
-                        if self.cycle >= 1 && self.cycle < 258 {
-                            self.status.set_flag(StatusRegFlag::SpriteZeroHit, true);
-                        }
+                        9
+                    };
+
+                    if self.cycle >= min_cycle && self.cycle < 258 {
+                        self.status.set_flag(StatusRegFlag::SpriteZeroHit, true);
                     }
                 }
 
