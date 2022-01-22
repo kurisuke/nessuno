@@ -55,6 +55,12 @@ pub struct SetPixel {
 
 pub type PatternTable = [[usize; 128]; 128];
 
+impl Default for Ppu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ppu {
     pub fn new() -> Ppu {
         Ppu {
@@ -161,8 +167,7 @@ impl Ppu {
                     }
                 }
 
-                if (self.cycle >= 2 && self.cycle < 258) || (self.cycle >= 321 && self.cycle < 338)
-                {
+                if (2..258).contains(&self.cycle) || (321..338).contains(&self.cycle) {
                     self.update_shifters();
 
                     match (self.cycle - 1) % 8 {
@@ -227,7 +232,7 @@ impl Ppu {
                         self.ppu_read(cart, 0x2000 | (self.vram_addr.reg & 0x0fff));
                 }
 
-                if self.scanline == -1 && self.cycle >= 280 && self.cycle < 305 {
+                if self.scanline == -1 && (280..305).contains(&self.cycle) {
                     self.transfer_address_y();
                 }
 
@@ -443,7 +448,7 @@ impl Ppu {
                         9
                     };
 
-                    if self.cycle >= min_cycle && self.cycle < 258 {
+                    if (min_cycle..258).contains(&self.cycle) {
                         self.status.set_flag(StatusRegFlag::SpriteZeroHit, true);
                     }
                 }
@@ -565,7 +570,7 @@ impl Ppu {
             self.bg_shifter_attrib_hi <<= 1;
         }
 
-        if self.mask.get_flag(MaskRegFlag::RenderSprites) && self.cycle >= 1 && self.cycle < 258 {
+        if self.mask.get_flag(MaskRegFlag::RenderSprites) && (1..258).contains(&self.cycle) {
             for (i, s) in self
                 .sprite_scanline
                 .iter_mut()
@@ -1117,7 +1122,7 @@ impl OamEntry {
 }
 
 fn visible(scanline: isize, cycle: usize) -> Option<(usize, usize)> {
-    if scanline >= 0 && scanline < 240 && cycle >= 1 && cycle <= 256 {
+    if (0..240).contains(&scanline) && (1..=256).contains(&cycle) {
         Some((scanline as usize, cycle - 1))
     } else {
         None
