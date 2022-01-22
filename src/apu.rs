@@ -17,6 +17,12 @@ pub struct Apu {
     frame_counter: FrameCounter,
 }
 
+impl Default for Apu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Apu {
     pub fn new() -> Apu {
         Apu {
