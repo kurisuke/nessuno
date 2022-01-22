@@ -280,9 +280,9 @@ impl Nessuno {
         }
     }
 
-    fn new(cart: Cartridge, audio_send: Sender<f32>) -> Nessuno {
+    fn new(cart: Cartridge, audio_send: Sender<f32>, sample_rate: u32) -> Nessuno {
         Nessuno {
-            system: System::new(cart, 44100),
+            system: System::new(cart, sample_rate),
             text_writer: TextWriter::new(
                 include_bytes!("../../res/cozette.bdf"),
                 TextScreenParams {
@@ -496,8 +496,8 @@ struct NessunoMin {
 }
 
 impl NessunoMin {
-    fn new(cart: Cartridge, audio_send: Sender<f32>) -> NessunoMin {
-        let mut system = System::new(cart, 44100);
+    fn new(cart: Cartridge, audio_send: Sender<f32>, sample_rate: u32) -> NessunoMin {
+        let mut system = System::new(cart, sample_rate);
         system.reset();
         NessunoMin {
             system,
@@ -623,6 +623,10 @@ fn main() -> Result<(), io::Error> {
     let cart = Cartridge::new(&args.rom_file)?;
 
     let (audio_send, audio_recv) = bounded(AUDIO_BUFFER_SIZE);
+    let (sample_rate_send, sample_rate_recv) = bounded(1);
+
+    audio::run(audio_recv, sample_rate_send);
+    let sample_rate = sample_rate_recv.recv().unwrap();
 
     let screen = if args.debug {
         Screen::new(
@@ -630,7 +634,7 @@ fn main() -> Result<(), io::Error> {
                 width: SCREEN_WIDTH,
                 height: SCREEN_HEIGHT,
                 title: "nessuno",
-                backend: Box::new(Nessuno::new(cart, audio_send)),
+                backend: Box::new(Nessuno::new(cart, audio_send, sample_rate)),
             },
             args.fullscreen,
         )
@@ -641,14 +645,12 @@ fn main() -> Result<(), io::Error> {
                 width: SCREEN_WIDTH_MIN,
                 height: SCREEN_HEIGHT_MIN,
                 title: "nessuno",
-                backend: Box::new(NessunoMin::new(cart, audio_send)),
+                backend: Box::new(NessunoMin::new(cart, audio_send, sample_rate)),
             },
             args.fullscreen,
         )
         .unwrap()
     };
-
-    audio::run(audio_recv);
 
     screen.run();
 

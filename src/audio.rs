@@ -1,13 +1,13 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Sample, SampleFormat, SampleRate, StreamConfig, SupportedBufferSize};
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
 pub const BUFFER_SIZE: u32 = 2048;
 const MIN_SAMPLE_RATE: u32 = 44100;
 
-pub fn run(audio_recv: Receiver<f32>) {
+pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
     thread::spawn(move || {
         let host = cpal::default_host();
         let device = host
@@ -49,6 +49,8 @@ pub fn run(audio_recv: Receiver<f32>) {
             "samplerate: {}, format: {:?}, channels: {}",
             selected_sample_rate.0, sample_format, num_channels
         );
+
+        sample_rate_send.send(selected_sample_rate.0).unwrap();
 
         let sample_callback = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
             for sample in data.iter_mut() {
