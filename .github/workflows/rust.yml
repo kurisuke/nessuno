@@ -1,4 +1,4 @@
-name: Rust
+name: CI
 
 on:
   push:
@@ -22,10 +22,10 @@ jobs:
         components: rustfmt, clippy
         override: true
 
-    - name: install alsa dev
+    - name: install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install libasound2-dev
+        sudo apt-get install libasound2-dev libudev-dev
 
     # make sure all code has been formatted with rustfmt
     - name: check rustfmt
@@ -47,10 +47,10 @@ jobs:
         toolchain: stable
         override: true
 
-    - name: install alsa dev
+    - name: install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install libasound2-dev
+        sudo apt-get install libasound2-dev libudev-dev
 
     - run: cargo fetch
     - name: cargo test build
