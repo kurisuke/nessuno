@@ -14,18 +14,19 @@ pub fn run(audio_recv: Receiver<f32>) {
             .default_output_device()
             .expect("no audio output device available");
 
-        let supported_configs_range = device
+        let mut supported_configs_range = device
             .supported_output_configs()
             .expect("error while querying configs");
         let supported_config = supported_configs_range
-            .filter(|supported_config| supported_config.channels() == 1)
-            .filter(|supported_config| match supported_config.buffer_size() {
-                SupportedBufferSize::Range { min, max } => {
-                    min <= &BUFFER_SIZE && &BUFFER_SIZE <= max
-                }
-                SupportedBufferSize::Unknown => true,
+            .find(|supported_config| {
+                supported_config.channels() == 1
+                    && match supported_config.buffer_size() {
+                        SupportedBufferSize::Range { min, max } => {
+                            min <= &BUFFER_SIZE && &BUFFER_SIZE <= max
+                        }
+                        SupportedBufferSize::Unknown => true,
+                    }
             })
-            .next()
             .expect("no supported config?!");
         let min_sample_rate = supported_config.min_sample_rate();
         let set_buffer_size = match supported_config.buffer_size() {
