@@ -897,19 +897,19 @@ mod tests {
         cpu.set_flag(Flag::I, true);
         cpu.set_flag(Flag::D, true);
         cpu.set_flag(Flag::V, true);
-        assert_eq!(cpu.get_flag(Flag::I), true);
-        assert_eq!(cpu.get_flag(Flag::D), true);
-        assert_eq!(cpu.get_flag(Flag::V), true);
-        assert_eq!(cpu.get_flag(Flag::N), false);
-        assert_eq!(cpu.get_flag(Flag::Z), false);
+        assert!(cpu.get_flag(Flag::I));
+        assert!(cpu.get_flag(Flag::D));
+        assert!(cpu.get_flag(Flag::V));
+        assert!(!cpu.get_flag(Flag::N));
+        assert!(!cpu.get_flag(Flag::Z));
 
         cpu.set_flag(Flag::I, false);
         cpu.set_flag(Flag::D, true);
         cpu.set_flag(Flag::V, false);
-        assert_eq!(cpu.get_flag(Flag::I), false);
-        assert_eq!(cpu.get_flag(Flag::D), true);
-        assert_eq!(cpu.get_flag(Flag::V), false);
-        assert_eq!(cpu.get_flag(Flag::N), false);
-        assert_eq!(cpu.get_flag(Flag::Z), false);
+        assert!(!cpu.get_flag(Flag::I));
+        assert!(cpu.get_flag(Flag::D));
+        assert!(!cpu.get_flag(Flag::V));
+        assert!(!cpu.get_flag(Flag::N));
+        assert!(!cpu.get_flag(Flag::Z));
     }
 }
