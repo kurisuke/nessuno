@@ -4,7 +4,7 @@ use nessuno::audio;
 use nessuno::cartridge::Cartridge;
 use nessuno::cpu::Flag;
 use nessuno::input::{InputGilrs, InputKeyboard};
-use nessuno::ppu::palette::PALETTE_2C02;
+use nessuno::ppu::palette::PALETTE_MAGNUM_FBX;
 use nessuno::ppu::SetPixel;
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
@@ -237,7 +237,7 @@ impl Nessuno {
                     354,
                     8,
                     8,
-                    &PALETTE_2C02[color],
+                    &PALETTE_MAGNUM_FBX[color],
                 );
             }
         }
@@ -275,7 +275,7 @@ impl Nessuno {
             for (offset_x, color_idx) in line.iter().enumerate() {
                 let offset_frame_x = offset_frame_y + offset_x * 4;
                 frame[offset_frame_x..offset_frame_x + 4]
-                    .copy_from_slice(&PALETTE_2C02[*color_idx]);
+                    .copy_from_slice(&PALETTE_MAGNUM_FBX[*color_idx]);
             }
         }
     }
@@ -595,7 +595,8 @@ fn set_video_pixel(render_params: &VideoRenderParams, frame: &mut [u8], p: &SetP
             let py = render_params.offset_y + p.pos.0;
             let px = render_params.offset_x + p.pos.1;
             let off = (py * render_params.width_y + px) * render_params.bytes_per_pixel;
-            frame[off..off + render_params.bytes_per_pixel].copy_from_slice(&PALETTE_2C02[p.color]);
+            frame[off..off + render_params.bytes_per_pixel]
+                .copy_from_slice(&PALETTE_MAGNUM_FBX[p.color]);
         }
         2 => {
             let py = render_params.offset_y + p.pos.0 * 2;
@@ -606,13 +607,13 @@ fn set_video_pixel(render_params: &VideoRenderParams, frame: &mut [u8], p: &SetP
             let off3 = ((py + 1) * render_params.width_y + px + 1) * render_params.bytes_per_pixel;
 
             frame[off0..off0 + render_params.bytes_per_pixel]
-                .copy_from_slice(&PALETTE_2C02[p.color]);
+                .copy_from_slice(&PALETTE_MAGNUM_FBX[p.color]);
             frame[off1..off1 + render_params.bytes_per_pixel]
-                .copy_from_slice(&PALETTE_2C02[p.color]);
+                .copy_from_slice(&PALETTE_MAGNUM_FBX[p.color]);
             frame[off2..off2 + render_params.bytes_per_pixel]
-                .copy_from_slice(&PALETTE_2C02[p.color]);
+                .copy_from_slice(&PALETTE_MAGNUM_FBX[p.color]);
             frame[off3..off3 + render_params.bytes_per_pixel]
-                .copy_from_slice(&PALETTE_2C02[p.color]);
+                .copy_from_slice(&PALETTE_MAGNUM_FBX[p.color]);
         }
         _ => unreachable!(),
     }
