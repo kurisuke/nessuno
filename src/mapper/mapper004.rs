@@ -226,4 +226,14 @@ impl Mapper for Mapper004 {
             }
         }
     }
+
+    fn load_ram(&mut self, ram: &[u8]) {
+        if self.prg_ram.len() == ram.len() {
+            self.prg_ram.copy_from_slice(ram);
+        }
+    }
+
+    fn save_ram(&self) -> Option<Vec<u8>> {
+        Some(self.prg_ram.to_vec())
+    }
 }

@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io;
 use std::io::Read;
 use std::mem;
+use std::path::{Path, MAIN_SEPARATOR};
 
 pub struct Cartridge {
     mem_prg: Vec<u8>,
@@ -13,6 +14,7 @@ pub struct Cartridge {
 
     hw_mirror: Mirror,
     mapper: Box<dyn Mapper>,
+    filename_save: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -76,7 +78,7 @@ impl Cartridge {
         let num_banks_prg = header.prg_rom_chunks as usize;
         let num_banks_chr = header.chr_rom_chunks as usize;
 
-        let mapper: Box<dyn Mapper> = match mapper_id {
+        let mut mapper: Box<dyn Mapper> = match mapper_id {
             0 => Box::new(Mapper000::new(num_banks_prg, num_banks_chr)),
             1 => Box::new(Mapper001::new(num_banks_prg, num_banks_chr)),
             2 => Box::new(Mapper002::new(num_banks_prg, num_banks_chr)),
@@ -90,6 +92,14 @@ impl Cartridge {
             "Mapper: {:03}, #prg: {}, #chr: {}",
             mapper_id, num_banks_prg, num_banks_chr
         );
+
+        // get battery-backed RAM
+        let filename_save = get_filename_save(filename);
+        if filename_save.is_some() && Path::new(&filename_save.as_ref().unwrap()).exists() {
+            if let Ok(ram) = std::fs::read(&filename_save.as_ref().unwrap()) {
+                mapper.load_ram(&ram);
+            }
+        }
 
         let file_type = 1;
         match file_type {
@@ -114,6 +124,7 @@ impl Cartridge {
                     mem_chr,
                     hw_mirror,
                     mapper,
+                    filename_save,
                 })
             }
             2 => {
@@ -194,4 +205,30 @@ impl Cartridge {
     pub fn reset(&mut self) {
         self.mapper.reset();
     }
+}
+
+impl Drop for Cartridge {
+    fn drop(&mut self) {
+        if let Some(filename_save) = self.filename_save.as_ref() {
+            if let Some(ram) = self.mapper.save_ram() {
+                std::fs::write(filename_save, ram).unwrap();
+            }
+        }
+    }
+}
+
+fn get_filename_save(filename: &str) -> Option<String> {
+    let mut filename_save = None;
+    let path = Path::new(filename);
+    if let Some(parent) = path.parent() {
+        if let Some(stem) = path.file_stem() {
+            filename_save = Some(format!(
+                "{}{}{}.sav",
+                parent.to_str().unwrap(),
+                MAIN_SEPARATOR,
+                stem.to_str().unwrap()
+            ));
+        }
+    }
+    filename_save
 }

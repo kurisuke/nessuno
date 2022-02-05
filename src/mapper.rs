@@ -40,4 +40,10 @@ pub trait Mapper {
     fn irq_clear(&mut self) {}
 
     fn on_scanline_end(&mut self) {}
+
+    fn load_ram(&mut self, _ram: &[u8]) {}
+
+    fn save_ram(&self) -> Option<Vec<u8>> {
+        None
+    }
 }
