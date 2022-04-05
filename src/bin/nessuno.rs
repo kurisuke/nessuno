@@ -6,6 +6,7 @@ use nessuno::cpu::Flag;
 use nessuno::input::{InputGilrs, InputKeyboard};
 use nessuno::ppu::palette::PALETTE_MAGNUM_FBX;
 use nessuno::ppu::SetPixel;
+use nessuno::save::SaveState;
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
@@ -38,6 +39,8 @@ struct Args {
     debug: bool,
     #[clap(short, long)]
     fullscreen: bool,
+    #[clap(short, long)]
+    reset: bool,
 }
 
 struct VideoRenderParams {
@@ -64,6 +67,8 @@ struct Nessuno {
 
     input_gilrs: InputGilrs,
     input_keyboard: InputKeyboard,
+
+    save: SaveState,
 
     run: bool,
     t_residual: f64,
@@ -315,9 +320,21 @@ impl Nessuno {
         }
     }
 
-    fn new(cart: Cartridge, audio_send: Sender<f32>, sample_rate: u32) -> Nessuno {
+    fn new(cart: Cartridge, reset: bool, audio_send: Sender<f32>, sample_rate: u32) -> Nessuno {
+        let save = SaveState::new(&cart.filename);
+        let system = match save.load() {
+            Some(system) if !reset => {
+                println!("Loaded save state from: {}", &save.save_file);
+                system
+            }
+            _ => {
+                let mut system = System::new(cart, sample_rate);
+                system.reset();
+                system
+            }
+        };
         Nessuno {
-            system: System::new(cart, sample_rate),
+            system,
             text_writer: TextWriter::new(
                 include_bytes!("../../res/cozette.bdf"),
                 TextScreenParams {
@@ -335,9 +352,10 @@ impl Nessuno {
             input_gilrs: InputGilrs::new(),
             input_keyboard: InputKeyboard::new(),
             audio_send,
+            save,
             run: false,
             t_residual: 0f64,
-            action: Some(UserAction::Reset),
+            action: None,
             display_oam: false,
             palette_selected: 0,
             paint: false,
@@ -515,6 +533,12 @@ impl ScreenBackend for Nessuno {
             self.action = Some(UserAction::PaletteSelect);
         }
     }
+
+    fn shutdown(&mut self, is_clean: bool) {
+        if is_clean && self.save.save(&self.system) {
+            println!("Saved state to: {}", &self.save.save_file);
+        }
+    }
 }
 
 struct NessunoMin {
@@ -526,14 +550,26 @@ struct NessunoMin {
 
     audio_send: Sender<f32>,
 
+    save: SaveState,
+
     run: bool,
     t_residual: f64,
 }
 
 impl NessunoMin {
-    fn new(cart: Cartridge, audio_send: Sender<f32>, sample_rate: u32) -> NessunoMin {
-        let mut system = System::new(cart, sample_rate);
-        system.reset();
+    fn new(cart: Cartridge, reset: bool, audio_send: Sender<f32>, sample_rate: u32) -> NessunoMin {
+        let save = SaveState::new(&cart.filename);
+        let system = match save.load() {
+            Some(system) if !reset => {
+                println!("Loaded save state from: {}", &save.save_file);
+                system
+            }
+            _ => {
+                let mut system = System::new(cart, sample_rate);
+                system.reset();
+                system
+            }
+        };
         NessunoMin {
             system,
             render_params: VideoRenderParams {
@@ -546,6 +582,7 @@ impl NessunoMin {
             input_gilrs: InputGilrs::new(),
             input_keyboard: InputKeyboard::new(),
             audio_send,
+            save,
             run: true,
             t_residual: 0f64,
         }
@@ -622,6 +659,12 @@ impl ScreenBackend for NessunoMin {
             }
         }
     }
+
+    fn shutdown(&mut self, is_clean: bool) {
+        if is_clean && self.save.save(&self.system) {
+            println!("Saved state to: {}", &self.save.save_file);
+        }
+    }
 }
 
 fn set_video_pixel(render_params: &VideoRenderParams, frame: &mut [u8], p: &SetPixel) {
@@ -670,7 +713,7 @@ fn main() -> Result<(), io::Error> {
                 width: SCREEN_WIDTH,
                 height: SCREEN_HEIGHT,
                 title: "nessuno",
-                backend: Box::new(Nessuno::new(cart, audio_send, sample_rate)),
+                backend: Box::new(Nessuno::new(cart, args.reset, audio_send, sample_rate)),
             },
             args.fullscreen,
         )
@@ -681,7 +724,7 @@ fn main() -> Result<(), io::Error> {
                 width: SCREEN_WIDTH_MIN,
                 height: SCREEN_HEIGHT_MIN,
                 title: "nessuno",
-                backend: Box::new(NessunoMin::new(cart, audio_send, sample_rate)),
+                backend: Box::new(NessunoMin::new(cart, args.reset, audio_send, sample_rate)),
             },
             args.fullscreen,
         )

@@ -88,6 +88,7 @@ impl<'a> Screen<'a> {
                     height: self.params.height,
                 });
                 if self.pixels.render().is_err() {
+                    self.params.backend.shutdown(false);
                     *control_flow = ControlFlow::Exit;
                     return;
                 }
@@ -97,6 +98,7 @@ impl<'a> Screen<'a> {
             if self.input.update(&event) {
                 // Close events
                 if self.input.key_pressed(VirtualKeyCode::Escape) || self.input.quit() {
+                    self.params.backend.shutdown(true);
                     *control_flow = ControlFlow::Exit;
                     return;
                 }

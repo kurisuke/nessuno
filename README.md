@@ -14,8 +14,9 @@ Using [Cozette](https://github.com/slavfox/Cozette/) bitmap font for UI text.
 
 - NTSC only
 - Audio: all channels except DMC
-- Mappers: 000, 001, 002, 003, 004, 007
+- Mappers: 000, 001, 002, 003, 004, 007, 009
 - Input: keyboard, fixed mapping, 1 controller only
+- Save states: autosave, currently one per ROM
 
 ## Build
 

@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct Cartridge {
+    pub filename: String,
+
     mem_prg: Vec<u8>,
     mem_chr: Vec<u8>,
 
@@ -113,6 +115,7 @@ impl Cartridge {
                 };
 
                 Ok(Cartridge {
+                    filename: String::from(filename),
                     mem_prg,
                     mem_chr,
                     hw_mirror,

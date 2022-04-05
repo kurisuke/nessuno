@@ -11,4 +11,6 @@ pub trait ScreenBackend {
     fn draw(&self, frame: Frame);
     fn update(&mut self, frame: Frame, dt: f64);
     fn handle_input(&mut self, input: &WinitInputHelper);
+
+    fn shutdown(&mut self, _is_clean: bool) {}
 }
