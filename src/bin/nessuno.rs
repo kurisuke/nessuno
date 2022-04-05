@@ -228,6 +228,7 @@ impl Nessuno {
             &BG_COLOR,
         );
 
+        // draw squares with pattern colors
         for palette in 0..8 {
             for pixel_value in 0..4 {
                 let color = self.system.ppu_get_color_from_palette(palette, pixel_value);
@@ -239,6 +240,40 @@ impl Nessuno {
                     8,
                     &PALETTE_MAGNUM_FBX[color],
                 );
+            }
+        }
+
+        //mark active palette
+        self.empty_rect(
+            frame,
+            572 + self.palette_selected * 40,
+            354,
+            32,
+            8,
+            &HL_COLOR,
+        );
+    }
+
+    fn empty_rect(
+        &mut self,
+        frame: &mut [u8],
+        pos_x: usize,
+        pos_y: usize,
+        size_x: usize,
+        size_y: usize,
+        color: &[u8; 4],
+    ) {
+        for y in [pos_y, pos_y + size_y - 1] {
+            for x in pos_x..(pos_x + size_x) {
+                let offset_frame = (y * SCREEN_WIDTH as usize + x) * 4;
+                frame[offset_frame..offset_frame + 4].copy_from_slice(color);
+            }
+        }
+
+        for x in [pos_x, pos_x + size_x - 1] {
+            for y in pos_y..(pos_y + size_y) {
+                let offset_frame = (y * SCREEN_WIDTH as usize + x) * 4;
+                frame[offset_frame..offset_frame + 4].copy_from_slice(color);
             }
         }
     }
