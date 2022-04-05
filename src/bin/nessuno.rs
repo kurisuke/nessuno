@@ -657,6 +657,9 @@ impl ScreenBackend for NessunoMin {
             if !self.run {
                 self.t_residual = 0f64;
             }
+        } else if input.key_pressed(VirtualKeyCode::R) {
+            self.system.reset();
+            self.run = true;
         }
     }
 
