@@ -1,8 +1,14 @@
 const LUT_PULSE_LEN: usize = 31;
 const LUT_TND_LEN: usize = 203;
 
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
+
+#[derive(Deserialize, Serialize)]
 pub struct Mixer {
+    #[serde(with = "BigArray")]
     lut_pulse: [f32; LUT_PULSE_LEN],
+    #[serde(with = "BigArray")]
     lut_tnd: [f32; LUT_TND_LEN],
 }
 

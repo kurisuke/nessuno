@@ -2,9 +2,15 @@ use super::{MapResult, Mapper};
 
 use crate::cartridge::Mirror;
 
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
+use typetag::serde;
+
+#[derive(Deserialize, Serialize)]
 pub struct Mapper009 {
     num_banks_prg_8k: usize,
 
+    #[serde(with = "BigArray")]
     prg_ram: [u8; 8 * 1024],
     prg_bank_select_8k: usize,
     chr_bank_select_4k_lo_fd: usize,
@@ -34,6 +40,7 @@ impl Mapper009 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mapper009 {
     fn cpu_map_read(&mut self, addr: u16) -> MapResult {
         self.cpu_map_read_ro(addr)

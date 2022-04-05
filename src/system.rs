@@ -4,9 +4,12 @@ use crate::cartridge::Cartridge;
 use crate::controller::{Controller, ControllerInput};
 use crate::cpu::{Cpu, Disassembly};
 use crate::ppu::{PatternTable, Ppu, SetPixel};
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 const TIME_PER_CLOCK: f64 = 1f64 / 5369318f64; // PPU Clock freq
 
+#[derive(Deserialize, Serialize)]
 pub struct System {
     pub cpu: Cpu,
     bus: Bus,
@@ -16,7 +19,9 @@ pub struct System {
     time_audio: f64,
 }
 
+#[derive(Deserialize, Serialize)]
 struct Bus {
+    #[serde(with = "BigArray")]
     ram_cpu: [u8; 2 * 1024],
     ppu: Ppu,
     apu: Apu,

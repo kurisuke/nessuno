@@ -1,5 +1,8 @@
 use super::misc::{Envelope, LengthCounter, Timer};
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 pub struct Noise {
     envelope: Envelope,
     timer: Timer,
@@ -76,6 +79,7 @@ impl Noise {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 struct ShiftReg {
     reg: u16,
     flag_mode: bool,

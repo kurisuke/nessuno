@@ -2,9 +2,11 @@ mod instr;
 
 use crate::bus::CpuBus;
 use instr::{AddrMode, Instr, Op, INSTR_LOOKUP};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::num::Wrapping;
 
+#[derive(Deserialize, Serialize)]
 pub struct Cpu {
     pub a: u8,      // accumulator register
     pub x: u8,      // X register

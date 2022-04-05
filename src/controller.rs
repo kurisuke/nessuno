@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ControllerInput {
     A,
@@ -10,6 +12,7 @@ pub enum ControllerInput {
     Right,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Controller {
     reg: u8,
     state: u8,

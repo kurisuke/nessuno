@@ -9,6 +9,9 @@ use noise::Noise;
 use pulse::Pulse;
 use triangle::Triangle;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 pub struct Apu {
     pulse: [Pulse; 2],
     triangle: Triangle,
@@ -126,12 +129,13 @@ struct ClockEvents {
     irq: bool,
 }
 
-#[derive(PartialEq)]
+#[derive(Deserialize, PartialEq, Serialize)]
 enum FrameCounterMode {
     Step4,
     Step5,
 }
 
+#[derive(Deserialize, Serialize)]
 struct FrameCounter {
     pub flag_irq_inhibit: bool,
     pub mode: FrameCounterMode,

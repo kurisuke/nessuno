@@ -15,6 +15,7 @@ pub enum MapResult {
     DirectWrite,
 }
 
+#[typetag::serde(tag = "id")]
 pub trait Mapper {
     fn cpu_map_read(&mut self, addr: u16) -> MapResult;
 

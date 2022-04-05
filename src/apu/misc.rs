@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 pub struct Timer {
     pub period: u16,
     cur: u16,
@@ -41,6 +44,7 @@ impl Timer {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct LengthCounter {
     counter: u8,
     pub halt: bool,
@@ -91,6 +95,7 @@ const LENGTH_TABLE: [u8; 32] = [
     192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
+#[derive(Deserialize, Serialize)]
 pub struct Sequencer {
     seq: u8,
     pos: u32,
@@ -126,6 +131,7 @@ impl Sequencer {
 
 const SEQUENCES: [u8; 4] = [0b01000000, 0b01100000, 0b01111000, 0b10011111];
 
+#[derive(Deserialize, Serialize)]
 pub struct Envelope {
     pub flag_start: bool,
     pub flag_loop: bool,

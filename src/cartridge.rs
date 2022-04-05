@@ -8,6 +8,9 @@ use std::io::Read;
 use std::mem;
 use std::path::{Path, MAIN_SEPARATOR};
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 pub struct Cartridge {
     mem_prg: Vec<u8>,
     mem_chr: Vec<u8>,
@@ -17,7 +20,7 @@ pub struct Cartridge {
     filename_save: Option<String>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum Mirror {
     Hardware,
     Vertical,

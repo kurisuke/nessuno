@@ -7,10 +7,14 @@ edition = "2021"
 
 [dependencies]
 bdf-parser = "0.1.0"
+bincode = "1.3.3"
 clap = { version = "3.0.9", features = ["derive"] }
 cpal = "0.13.4"
 crossbeam-channel = "0.5.1"
 gilrs = "0.8.2"
 pixels = "0.9.0"
+serde = "1.0.136"
+serde-big-array = "0.4.1"
+typetag = "0.1.8"
 winit = "0.26.0"
 winit_input_helper = "0.11.0"

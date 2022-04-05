@@ -1,5 +1,9 @@
 use super::{MapResult, Mapper};
 
+use serde::{Deserialize, Serialize};
+use typetag::serde;
+
+#[derive(Deserialize, Serialize)]
 pub struct Mapper003 {
     num_banks_prg: usize,
     num_banks_chr: usize,
@@ -16,6 +20,7 @@ impl Mapper003 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mapper003 {
     fn cpu_map_read(&mut self, addr: u16) -> MapResult {
         self.cpu_map_read_ro(addr)

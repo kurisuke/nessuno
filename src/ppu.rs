@@ -1,10 +1,13 @@
 pub mod palette;
 
 use crate::cartridge::{Cartridge, Mirror};
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
+#[derive(Deserialize, Serialize)]
 pub struct Ppu {
-    tbl_pattern: [[u8; 4 * 1024]; 2],
-    tbl_name: [[u8; 1024]; 2],
+    tbl_pattern: [PatternTableMem; 2],
+    tbl_name: [NameTableMem; 2],
     tbl_palette: [u8; 32],
 
     scanline: isize,
@@ -30,6 +33,7 @@ pub struct Ppu {
     bg_shifter_attrib_lo: u16,
     bg_shifter_attrib_hi: u16,
 
+    #[serde(with = "BigArray")]
     oam: [OamEntry; 64],
     oam_addr: u8,
 
@@ -64,8 +68,8 @@ impl Default for Ppu {
 impl Ppu {
     pub fn new() -> Ppu {
         Ppu {
-            tbl_pattern: [[0; 4 * 1024]; 2],
-            tbl_name: [[0; 1024]; 2],
+            tbl_pattern: [PatternTableMem { b: [0; 4 * 1024] }; 2],
+            tbl_name: [NameTableMem { b: [0; 1024] }; 2],
             tbl_palette: [0; 32],
 
             cycle: 0,
@@ -792,7 +796,7 @@ impl Ppu {
         } else {
             match addr {
                 0x0000..=0x1fff => {
-                    self.tbl_pattern[((addr & 0x1000) >> 12) as usize][(addr & 0x0fff) as usize]
+                    self.tbl_pattern[((addr & 0x1000) >> 12) as usize].b[(addr & 0x0fff) as usize]
                 }
                 0x2000..=0x3eff => {
                     addr &= 0x0fff;
@@ -800,20 +804,20 @@ impl Ppu {
                     match cart.mirror() {
                         Mirror::Vertical => match addr {
                             0x0000..=0x03ff | 0x0800..=0x0bff => {
-                                self.tbl_name[0][(addr & 0x03ff) as usize]
+                                self.tbl_name[0].b[(addr & 0x03ff) as usize]
                             }
                             0x0400..=0x07ff | 0x0c00..=0x0fff => {
-                                self.tbl_name[1][(addr & 0x03ff) as usize]
+                                self.tbl_name[1].b[(addr & 0x03ff) as usize]
                             }
                             _ => 0x00,
                         },
                         Mirror::Horizontal => match addr {
-                            0x0000..=0x07ff => self.tbl_name[0][(addr & 0x03ff) as usize],
-                            0x0800..=0x0fff => self.tbl_name[1][(addr & 0x03ff) as usize],
+                            0x0000..=0x07ff => self.tbl_name[0].b[(addr & 0x03ff) as usize],
+                            0x0800..=0x0fff => self.tbl_name[1].b[(addr & 0x03ff) as usize],
                             _ => 0x00,
                         },
-                        Mirror::OneScreenLo => self.tbl_name[0][(addr & 0x03ff) as usize],
-                        Mirror::OneScreenHi => self.tbl_name[1][(addr & 0x03ff) as usize],
+                        Mirror::OneScreenLo => self.tbl_name[0].b[(addr & 0x03ff) as usize],
+                        Mirror::OneScreenHi => self.tbl_name[1].b[(addr & 0x03ff) as usize],
                         _ => 0x00,
                     }
                 }
@@ -836,8 +840,8 @@ impl Ppu {
         if !cart.ppu_write(addr, data) {
             match addr {
                 0x0000..=0x1fff => {
-                    self.tbl_pattern[((addr & 0x1000) >> 12) as usize][(addr & 0x0fff) as usize] =
-                        data;
+                    self.tbl_pattern[((addr & 0x1000) >> 12) as usize].b
+                        [(addr & 0x0fff) as usize] = data;
                 }
                 0x2000..=0x3eff => {
                     addr &= 0x0fff;
@@ -845,27 +849,27 @@ impl Ppu {
                     match cart.mirror() {
                         Mirror::Vertical => match addr {
                             0x0000..=0x03ff | 0x0800..=0x0bff => {
-                                self.tbl_name[0][(addr & 0x03ff) as usize] = data;
+                                self.tbl_name[0].b[(addr & 0x03ff) as usize] = data;
                             }
                             0x0400..=0x07ff | 0x0c00..=0x0fff => {
-                                self.tbl_name[1][(addr & 0x03ff) as usize] = data;
+                                self.tbl_name[1].b[(addr & 0x03ff) as usize] = data;
                             }
                             _ => {}
                         },
                         Mirror::Horizontal => match addr {
                             0x0000..=0x07ff => {
-                                self.tbl_name[0][(addr & 0x03ff) as usize] = data;
+                                self.tbl_name[0].b[(addr & 0x03ff) as usize] = data;
                             }
                             0x0800..=0x0fff => {
-                                self.tbl_name[1][(addr & 0x03ff) as usize] = data;
+                                self.tbl_name[1].b[(addr & 0x03ff) as usize] = data;
                             }
                             _ => {}
                         },
                         Mirror::OneScreenLo => {
-                            self.tbl_name[0][(addr & 0x03ff) as usize] = data;
+                            self.tbl_name[0].b[(addr & 0x03ff) as usize] = data;
                         }
                         Mirror::OneScreenHi => {
-                            self.tbl_name[1][(addr & 0x03ff) as usize] = data;
+                            self.tbl_name[1].b[(addr & 0x03ff) as usize] = data;
                         }
                         _ => {}
                     }
@@ -886,6 +890,7 @@ impl Ppu {
 
 /// PPU Registers
 
+#[derive(Deserialize, Serialize)]
 struct StatusReg {
     pub reg: u8,
 }
@@ -923,6 +928,7 @@ impl StatusRegFlag {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 struct MaskReg {
     pub reg: u8,
 }
@@ -971,6 +977,7 @@ impl MaskRegFlag {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 struct ControlReg {
     pub reg: u8,
 }
@@ -1019,6 +1026,7 @@ impl ControlRegFlag {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 struct LoopyReg {
     reg: u16,
 }
@@ -1080,7 +1088,7 @@ impl LoopyReg {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Deserialize, Serialize)]
 struct OamEntry {
     pub bytes: [u8; 4],
 }
@@ -1119,6 +1127,18 @@ impl OamEntry {
             self.bytes[3], self.bytes[0], self.bytes[1], self.bytes[2]
         )
     }
+}
+
+#[derive(Copy, Clone, Deserialize, Serialize)]
+struct PatternTableMem {
+    #[serde(with = "BigArray")]
+    b: [u8; 4 * 1024],
+}
+
+#[derive(Copy, Clone, Deserialize, Serialize)]
+struct NameTableMem {
+    #[serde(with = "BigArray")]
+    b: [u8; 1024],
 }
 
 fn visible(scanline: isize, cycle: usize) -> Option<(usize, usize)> {

@@ -1,5 +1,8 @@
 use super::misc::{Envelope, LengthCounter, Sequencer, Timer};
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 pub struct Pulse {
     envelope: Envelope,
     sweep: Sweep,
@@ -108,6 +111,7 @@ impl Pulse {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 struct Sweep {
     pub flag_enabled: bool,
     pub flag_negate: bool,

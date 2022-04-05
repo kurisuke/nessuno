@@ -1,5 +1,8 @@
 use super::misc::{LengthCounter, Timer};
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
 pub struct Triangle {
     timer: Timer,
     linear_counter: LinearCounter,
@@ -70,6 +73,7 @@ impl Triangle {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 struct LinearCounter {
     pub flag_reload: bool,
     pub flag_control: bool,
@@ -104,6 +108,7 @@ impl LinearCounter {
     }
 }
 
+#[derive(Deserialize, Serialize)]
 struct Sequencer {
     pos: usize,
 }

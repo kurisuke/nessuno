@@ -1,6 +1,10 @@
 use super::{MapResult, Mapper};
 use crate::cartridge::Mirror;
 
+use serde::{Deserialize, Serialize};
+use typetag::serde;
+
+#[derive(Deserialize, Serialize)]
 pub struct Mapper007 {
     num_banks_prg: usize,
     num_banks_chr: usize,
@@ -19,6 +23,7 @@ impl Mapper007 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mapper007 {
     fn cpu_map_read(&mut self, addr: u16) -> MapResult {
         self.cpu_map_read_ro(addr)
