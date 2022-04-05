@@ -213,14 +213,4 @@ impl Mapper for Mapper001 {
         self.chr_bank_select_4_hi = 0;
         self.chr_bank_select_8 = 0;
     }
-
-    fn load_ram(&mut self, ram: &[u8]) {
-        if self.prg_ram.len() == ram.len() {
-            self.prg_ram.copy_from_slice(ram);
-        }
-    }
-
-    fn save_ram(&self) -> Option<Vec<u8>> {
-        Some(self.prg_ram.to_vec())
-    }
 }
