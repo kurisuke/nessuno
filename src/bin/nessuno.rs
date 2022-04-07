@@ -441,7 +441,7 @@ impl ScreenBackend for Nessuno {
             frame.frame,
             5,
             37,
-            "SPACE = run/pause      R = reset      S = step      F = frame      T = toggle oam/disasm      F11 = fullscreen      ESC = quit",
+            "SPACE = run/pause     CTRL+R = reset     S = step     F = frame     T = toggle oam/disasm     F11 = fullscreen     ESC = quit",
             &FG_COLOR,
             &BG_COLOR,
         );
@@ -519,7 +519,7 @@ impl ScreenBackend for Nessuno {
             if !self.run {
                 self.t_residual = 0f64;
             }
-        } else if input.key_pressed(VirtualKeyCode::R) {
+        } else if input.key_pressed(VirtualKeyCode::R) && input.held_control() {
             self.action = Some(UserAction::Reset);
         } else if input.key_pressed(VirtualKeyCode::F) {
             self.action = Some(UserAction::Frame);
@@ -657,7 +657,7 @@ impl ScreenBackend for NessunoMin {
             if !self.run {
                 self.t_residual = 0f64;
             }
-        } else if input.key_pressed(VirtualKeyCode::R) {
+        } else if input.key_pressed(VirtualKeyCode::R) && input.held_control() {
             self.system.reset();
             self.run = true;
         }
