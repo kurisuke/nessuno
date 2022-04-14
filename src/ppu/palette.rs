@@ -1,5 +1,5 @@
 /// NES NTSC Palette "Magnum (FBX)"
-/// source: http://www.firebrandx.com/nespalettes.html
+/// source: <http://www.firebrandx.com/nespalettes.html>
 pub const PALETTE_MAGNUM_FBX: [[u8; 4]; 64] = [
     // 0x00 - 0x0f
     [0x60, 0x60, 0x60, 0xff],

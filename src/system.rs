@@ -57,9 +57,9 @@ struct Bus {
 pub struct SystemClockResult {
     /// pixel information for screen update
     pub set_pixel: Option<SetPixel>,
-    /// flag if completed video frame (fi
+    /// flag if completed video frame (scanline -1, position 0)
     pub frame_complete: bool,
-    /// flag for completed frame (scanline -1, position 0)
+    /// flag if completed CPU instruction
     pub cpu_complete: bool,
     /// audio sample (optional, produced based on audio driver output frequency)
     pub audio_sample: Option<f32>,
