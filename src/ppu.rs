@@ -12,6 +12,7 @@ pub struct Ppu {
 
     scanline: isize,
     cycle: usize,
+    odd_frame: bool,
 
     control: ControlReg,
     mask: MaskReg,
@@ -74,6 +75,7 @@ impl Ppu {
 
             cycle: 0,
             scanline: 0,
+            odd_frame: false,
 
             control: ControlReg { reg: 0x00 },
             mask: MaskReg { reg: 0x00 },
@@ -118,6 +120,7 @@ impl Ppu {
         self.ppu_data_buffer = 0x00;
         self.scanline = 0;
         self.cycle = 0;
+        self.odd_frame = false;
         self.bg_next_tile_id = 0x00;
         self.bg_next_tile_attrib = 0x00;
         self.bg_next_tile_lsb = 0x00;
@@ -156,7 +159,10 @@ impl Ppu {
             -1..=239 => {
                 if self.scanline == 0 && self.cycle == 0 {
                     // "Odd frame" cycle skip
-                    self.cycle = 1;
+                    if self.odd_frame {
+                        self.cycle = 1;
+                    }
+                    self.odd_frame = !self.odd_frame;
                 }
 
                 if self.scanline == -1 && self.cycle == 1 {
@@ -632,6 +638,10 @@ impl Ppu {
                 // special case: palette memory is returned without cycle delay
                 if self.vram_addr.reg > 0x3f00 {
                     data = self.ppu_data_buffer;
+
+                    // update the buffer with the values from the mirrored range 0x2f00..0x2fff (nametable data)
+                    self.ppu_data_buffer =
+                        self.ppu_read(cart, 0x2000 | (self.vram_addr.reg & 0x0fff));
                 }
                 self.vram_addr.reg += if self.control.get_flag(ControlRegFlag::IncrementMode) {
                     32
