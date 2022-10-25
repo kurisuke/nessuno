@@ -8,15 +8,18 @@ edition = "2021"
 [dependencies]
 bdf-parser = "0.1.0"
 bincode = "1.3.3"
-clap = { version = "3.2.13", features = ["derive"] }
-cpal = "0.13.5"
-crossbeam-channel = "0.5.5"
+clap = { version = "4.0.18", features = ["derive"] }
+cpal = "0.14.1"
+crossbeam-channel = "0.5.6"
 directories = "4.0.1"
 flate2 = "1.0.24"
 gilrs = "0.9.0"
 pixels = "0.9.0"
-serde = "1.0.140"
+serde = "1.0.147"
 serde-big-array = "0.4.1"
-typetag = "0.2.1"
-winit = "0.26.1"
-winit_input_helper = "0.12.0"
+typetag = "0.2.3"
+winit = "0.27.4"
+winit_input_helper = "0.13.0"
+
+[profile.release]
+lto = true
