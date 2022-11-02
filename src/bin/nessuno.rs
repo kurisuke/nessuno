@@ -581,7 +581,7 @@ impl NessunoMin {
         sample_rate: u32,
         tv_standard: TvStandard,
     ) -> NessunoMin {
-        let save = SaveState::new(&cart.filename);
+        let save = SaveState::new(&cart.sha1_digest);
         let system = match save.load() {
             Some(system) if !reset => {
                 println!("Loaded save state from: {}", &save.save_file);

@@ -12,7 +12,7 @@ pub struct SaveState {
 }
 
 impl SaveState {
-    pub fn new(rom_filename: &str) -> SaveState {
+    pub fn new(rom_sha1: &str) -> SaveState {
         // find & create save directory
         let base_dirs = BaseDirs::new().unwrap();
         let mut save_file_buf = PathBuf::new();
@@ -23,7 +23,7 @@ impl SaveState {
         std::fs::create_dir_all(&save_file_buf).unwrap();
 
         // get save file name
-        let rom_file_path = Path::new(rom_filename);
+        let rom_file_path = Path::new(rom_sha1);
         let rom_file_stem = rom_file_path.file_stem().unwrap();
         save_file_buf.push(rom_file_stem);
         save_file_buf.set_extension("sav");

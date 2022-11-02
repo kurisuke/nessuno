@@ -1279,6 +1279,7 @@ dependencies = [
  "pixels",
  "serde",
  "serde-big-array",
+ "sha1_smol",
  "typetag",
  "winit",
  "winit_input_helper",

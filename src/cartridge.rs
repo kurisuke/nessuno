@@ -4,14 +4,16 @@ use crate::mapper::{
 };
 use std::fs::File;
 use std::io;
-use std::io::Read;
+use std::io::{Read, Seek};
 use std::mem;
 
 use serde::{Deserialize, Serialize};
+use sha1_smol::Sha1;
 
 #[derive(Deserialize, Serialize)]
 pub struct Cartridge {
     pub filename: String,
+    pub sha1_digest: String,
 
     mem_prg: Vec<u8>,
     mem_chr: Vec<u8>,
@@ -66,6 +68,12 @@ impl Cartridge {
     pub fn new(filename: &str) -> Result<Cartridge, io::Error> {
         let f = File::open(filename)?;
         let mut reader = io::BufReader::new(f);
+
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data)?;
+        let sha1_digest = Sha1::from(&data).digest().to_string();
+
+        reader.rewind()?;
         let header = CartridgeHeader::load(&mut reader)?;
 
         if header.mapper1 & 0x04 != 0 {
@@ -116,6 +124,7 @@ impl Cartridge {
 
                 Ok(Cartridge {
                     filename: String::from(filename),
+                    sha1_digest,
                     mem_prg,
                     mem_chr,
                     hw_mirror,
