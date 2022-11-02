@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
 /// time per PPU clock
-const TIME_PER_CLOCK: f64 = 1f64 / 5369318f64;
+const TIME_PER_CLOCK_NTSC: f64 = 1f64 / 5369318f64;
+const TIME_PER_CLOCK_PAL: f64 = 1f64 / 5320342f64;
 
 #[derive(Deserialize, Serialize)]
 /// representation of NES system hardware, including all components
@@ -18,12 +19,20 @@ pub struct System {
     /// other components on CPU memory bus
     bus: Bus,
 
+    /// TV standard (NTSC / PAL)
+    tv_standard: TvStandard,
     /// clock counter (in PPU cycles)
     clock_counter: usize,
     /// rate at which APU emulation produces new samples (depends on audio driver output frequency)
     time_per_sample: f64,
     /// elapsed time since last audio sample producation
     time_audio: f64,
+}
+
+#[derive(Deserialize, Serialize, Copy, Clone)]
+pub enum TvStandard {
+    Ntsc,
+    Pal,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -73,12 +82,12 @@ impl System {
     /// * `sample_rate` - audio driver output frequency in Hz. Will
     ///   determine APU sample production rate.
     ///
-    pub fn new(cart: Cartridge, sample_rate: u32) -> System {
+    pub fn new(cart: Cartridge, sample_rate: u32, tv_standard: TvStandard) -> System {
         System {
             cpu: Cpu::new(),
             bus: Bus {
                 ram_cpu: [0; 2 * 1024],
-                ppu: Ppu::new(),
+                ppu: Ppu::new(tv_standard),
                 apu: Apu::new(),
                 cart,
                 controller: [Controller::new(), Controller::new()],
@@ -89,6 +98,7 @@ impl System {
                 dma_transfer: false,
                 dma_start_wait: true,
             },
+            tv_standard,
             clock_counter: 0,
             time_per_sample: 1f64 / (sample_rate as f64),
             time_audio: 0f64,
@@ -131,7 +141,10 @@ impl System {
         }
 
         // Produce audio sample from APU, if required time elapsed
-        self.time_audio += TIME_PER_CLOCK;
+        self.time_audio += match self.tv_standard {
+            TvStandard::Ntsc => TIME_PER_CLOCK_NTSC,
+            TvStandard::Pal => TIME_PER_CLOCK_PAL,
+        };
         if self.time_audio >= self.time_per_sample {
             self.time_audio -= self.time_per_sample;
             res.audio_sample = Some(self.bus.apu.get_output_sample());

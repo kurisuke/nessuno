@@ -3,6 +3,7 @@ pub mod palette;
 use std::num::Wrapping;
 
 use crate::cartridge::{Cartridge, Mirror};
+use crate::system::TvStandard;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
@@ -13,6 +14,7 @@ pub struct Ppu {
     tbl_palette: [u8; 32],
 
     scanline: isize,
+    scanline_max: isize,
     cycle: usize,
     odd_frame: bool,
 
@@ -62,14 +64,17 @@ pub struct SetPixel {
 
 pub type PatternTable = [[usize; 128]; 128];
 
+const SCANLINE_MAX_NTSC: isize = 260;
+const SCANLINE_MAX_PAL: isize = 310;
+
 impl Default for Ppu {
     fn default() -> Self {
-        Self::new()
+        Self::new(TvStandard::Ntsc)
     }
 }
 
 impl Ppu {
-    pub fn new() -> Ppu {
+    pub fn new(tv_standard: TvStandard) -> Ppu {
         Ppu {
             tbl_pattern: [PatternTableMem { b: [0; 4 * 1024] }; 2],
             tbl_name: [NameTableMem { b: [0; 1024] }; 2],
@@ -77,6 +82,10 @@ impl Ppu {
 
             cycle: 0,
             scanline: 0,
+            scanline_max: match tv_standard {
+                TvStandard::Ntsc => SCANLINE_MAX_NTSC,
+                TvStandard::Pal => SCANLINE_MAX_PAL,
+            },
             odd_frame: false,
 
             control: ControlReg { reg: 0x00 },
@@ -364,7 +373,7 @@ impl Ppu {
             240 => {
                 // Post render scanline - do nothing
             }
-            241..=260 => {
+            241.. => {
                 if self.scanline == 241 && self.cycle == 1 {
                     // end of frame, start of vblank period
                     // if configured, emit CPU NMI
@@ -483,7 +492,7 @@ impl Ppu {
         if self.cycle >= 341 {
             self.cycle = 0;
             self.scanline += 1;
-            if self.scanline >= 261 {
+            if self.scanline > self.scanline_max {
                 self.scanline = -1;
                 res.frame_complete = true;
             }

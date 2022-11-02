@@ -10,7 +10,7 @@ use nessuno::save::SaveState;
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
-use nessuno::system::System;
+use nessuno::system::{System, TvStandard};
 use std::io;
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
@@ -27,7 +27,8 @@ const OFF_COLOR: [u8; 4] = [0xbf, 0x00, 0x00, 0xff];
 const ON_COLOR: [u8; 4] = [0x00, 0xbf, 0x00, 0xff];
 const HL_COLOR: [u8; 4] = [0xbf, 0xbf, 0xff, 0xff];
 
-const FRAME_DURATION: f64 = 1f64 / 60f64;
+const FRAME_DURATION_NTSC: f64 = 1f64 / 60f64;
+const FRAME_DURATION_PAL: f64 = 1f64 / 50f64;
 
 const AUDIO_BUFFER_SIZE: usize = (crate::audio::BUFFER_SIZE as usize) * 2;
 
@@ -41,6 +42,8 @@ struct Args {
     fullscreen: bool,
     #[clap(short, long)]
     reset: bool,
+    #[clap(short, long)]
+    pal: bool,
 }
 
 struct VideoRenderParams {
@@ -76,6 +79,8 @@ struct Nessuno {
     display_oam: bool,
     palette_selected: usize,
     paint: bool,
+
+    frame_duration: f64,
 }
 
 impl Nessuno {
@@ -320,7 +325,13 @@ impl Nessuno {
         }
     }
 
-    fn new(cart: Cartridge, reset: bool, audio_send: Sender<f32>, sample_rate: u32) -> Nessuno {
+    fn new(
+        cart: Cartridge,
+        reset: bool,
+        audio_send: Sender<f32>,
+        sample_rate: u32,
+        tv_standard: TvStandard,
+    ) -> Nessuno {
         let save = SaveState::new(&cart.filename);
         let system = match save.load() {
             Some(system) if !reset => {
@@ -328,7 +339,7 @@ impl Nessuno {
                 system
             }
             _ => {
-                let mut system = System::new(cart, sample_rate);
+                let mut system = System::new(cart, sample_rate, tv_standard);
                 system.reset();
                 system
             }
@@ -359,6 +370,10 @@ impl Nessuno {
             display_oam: false,
             palette_selected: 0,
             paint: false,
+            frame_duration: match tv_standard {
+                TvStandard::Ntsc => FRAME_DURATION_NTSC,
+                TvStandard::Pal => FRAME_DURATION_PAL,
+            },
         }
     }
 
@@ -478,7 +493,7 @@ impl ScreenBackend for Nessuno {
             if self.t_residual > 0f64 {
                 self.t_residual -= dt;
             } else {
-                self.t_residual += FRAME_DURATION - dt;
+                self.t_residual += self.frame_duration - dt;
                 self.frame(frame.frame, false, true);
                 self.draw_ppu_data(frame.frame);
                 self.paint = true;
@@ -554,10 +569,18 @@ struct NessunoMin {
 
     run: bool,
     t_residual: f64,
+
+    frame_duration: f64,
 }
 
 impl NessunoMin {
-    fn new(cart: Cartridge, reset: bool, audio_send: Sender<f32>, sample_rate: u32) -> NessunoMin {
+    fn new(
+        cart: Cartridge,
+        reset: bool,
+        audio_send: Sender<f32>,
+        sample_rate: u32,
+        tv_standard: TvStandard,
+    ) -> NessunoMin {
         let save = SaveState::new(&cart.filename);
         let system = match save.load() {
             Some(system) if !reset => {
@@ -565,7 +588,7 @@ impl NessunoMin {
                 system
             }
             _ => {
-                let mut system = System::new(cart, sample_rate);
+                let mut system = System::new(cart, sample_rate, tv_standard);
                 system.reset();
                 system
             }
@@ -585,6 +608,10 @@ impl NessunoMin {
             save,
             run: true,
             t_residual: 0f64,
+            frame_duration: match tv_standard {
+                TvStandard::Ntsc => FRAME_DURATION_NTSC,
+                TvStandard::Pal => FRAME_DURATION_PAL,
+            },
         }
     }
 
@@ -639,7 +666,7 @@ impl ScreenBackend for NessunoMin {
             if self.t_residual > 0f64 {
                 self.t_residual -= dt;
             } else {
-                self.t_residual += FRAME_DURATION - dt;
+                self.t_residual += self.frame_duration - dt;
                 self.frame(frame.frame);
             }
         }
@@ -710,13 +737,25 @@ fn main() -> Result<(), io::Error> {
     audio::run(audio_recv, sample_rate_send);
     let sample_rate = sample_rate_recv.recv().unwrap();
 
+    let tv_standard = if args.pal {
+        TvStandard::Pal
+    } else {
+        TvStandard::Ntsc
+    };
+
     let screen = if args.debug {
         Screen::new(
             ScreenParams {
                 width: SCREEN_WIDTH,
                 height: SCREEN_HEIGHT,
                 title: "nessuno",
-                backend: Box::new(Nessuno::new(cart, args.reset, audio_send, sample_rate)),
+                backend: Box::new(Nessuno::new(
+                    cart,
+                    args.reset,
+                    audio_send,
+                    sample_rate,
+                    tv_standard,
+                )),
             },
             args.fullscreen,
         )
@@ -727,7 +766,13 @@ fn main() -> Result<(), io::Error> {
                 width: SCREEN_WIDTH_MIN,
                 height: SCREEN_HEIGHT_MIN,
                 title: "nessuno",
-                backend: Box::new(NessunoMin::new(cart, args.reset, audio_send, sample_rate)),
+                backend: Box::new(NessunoMin::new(
+                    cart,
+                    args.reset,
+                    audio_send,
+                    sample_rate,
+                    tv_standard,
+                )),
             },
             args.fullscreen,
         )
