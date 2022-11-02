@@ -6,6 +6,7 @@ use nessuno::cpu::Flag;
 use nessuno::input::{InputGilrs, InputKeyboard};
 use nessuno::ppu::palette::PALETTE_MAGNUM_FBX;
 use nessuno::ppu::SetPixel;
+use nessuno::romdb;
 use nessuno::save::SaveState;
 use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
@@ -731,6 +732,14 @@ fn main() -> Result<(), io::Error> {
     let args = Args::parse();
     let cart = Cartridge::new(&args.rom_file)?;
 
+    let mut window_title = String::from("nessuno");
+    if let Some(rom_db) = romdb::load() {
+        if let Some(rom_name) = rom_db.get(&cart.sha1_digest) {
+            println!("ROM name: {}", rom_name);
+            window_title = format!("{} [nessuno]", rom_name);
+        }
+    }
+
     let (audio_send, audio_recv) = bounded(AUDIO_BUFFER_SIZE);
     let (sample_rate_send, sample_rate_recv) = bounded(1);
 
@@ -748,7 +757,7 @@ fn main() -> Result<(), io::Error> {
             ScreenParams {
                 width: SCREEN_WIDTH,
                 height: SCREEN_HEIGHT,
-                title: "nessuno",
+                title: &window_title,
                 backend: Box::new(Nessuno::new(
                     cart,
                     args.reset,
@@ -765,7 +774,7 @@ fn main() -> Result<(), io::Error> {
             ScreenParams {
                 width: SCREEN_WIDTH_MIN,
                 height: SCREEN_HEIGHT_MIN,
-                title: "nessuno",
+                title: &window_title,
                 backend: Box::new(NessunoMin::new(
                     cart,
                     args.reset,

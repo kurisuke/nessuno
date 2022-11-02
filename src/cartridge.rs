@@ -4,7 +4,7 @@ use crate::mapper::{
 };
 use std::fs::File;
 use std::io;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, SeekFrom};
 use std::mem;
 
 use serde::{Deserialize, Serialize};
@@ -70,6 +70,7 @@ impl Cartridge {
         let mut reader = io::BufReader::new(f);
 
         let mut data = Vec::new();
+        reader.seek(SeekFrom::Start(16))?;
         reader.read_to_end(&mut data)?;
         let sha1_digest = Sha1::from(&data).digest().to_string();
 

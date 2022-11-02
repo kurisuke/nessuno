@@ -7,6 +7,7 @@ pub mod cpu;
 pub mod input;
 pub mod mapper;
 pub mod ppu;
+pub mod romdb;
 pub mod save;
 pub mod screen;
 pub mod system;
