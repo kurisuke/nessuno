@@ -1,5 +1,7 @@
 pub mod palette;
 
+use std::num::Wrapping;
+
 use crate::cartridge::{Cartridge, Mirror};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -704,6 +706,11 @@ impl Ppu {
                 let entry = self.oam_addr / 4;
                 let offset = self.oam_addr % 4;
                 self.oam[entry as usize].bytes[offset as usize] = data;
+
+                // outside vblank, icrement OAMADDR
+                if !self.status.get_flag(StatusRegFlag::VerticalBlank) {
+                    self.oam_addr = (Wrapping(self.oam_addr) + Wrapping(1)).0;
+                }
             }
             0x0005 => {
                 // Scroll
@@ -744,10 +751,11 @@ impl Ppu {
         }
     }
 
-    pub fn write_oam(&mut self, addr: u8, data: u8) {
-        let entry = addr / 4;
-        let offset = addr % 4;
+    pub fn write_oam(&mut self, data: u8) {
+        let entry = self.oam_addr / 4;
+        let offset = self.oam_addr % 4;
         self.oam[entry as usize].bytes[offset as usize] = data;
+        self.oam_addr = (Wrapping(self.oam_addr) + Wrapping(1)).0;
     }
 
     pub fn debug_oam(&self, entry: usize) -> String {

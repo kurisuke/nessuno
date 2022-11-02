@@ -238,7 +238,7 @@ impl System {
                 .cpu_read(((self.bus.dma_page as u16) << 8) | (self.bus.dma_addr as u16));
         } else {
             // odd cycle: write to ppu
-            self.bus.ppu.write_oam(self.bus.dma_addr, self.bus.dma_data);
+            self.bus.ppu.write_oam(self.bus.dma_data);
 
             // end transfer and reset addr pointer after full no. of cycles
             if self.bus.dma_addr == 255 {
@@ -272,7 +272,7 @@ impl CpuBus for Bus {
                 // Direct Memory Access (DMA)
                 0x4014 => {
                     self.dma_page = data;
-                    self.dma_addr = 0x00;
+                    self.dma_addr = 0;
                     self.dma_transfer = true;
                 } // Controller Ports
                 0x4016 => {
