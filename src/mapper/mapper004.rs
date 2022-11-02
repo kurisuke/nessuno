@@ -11,6 +11,9 @@ pub struct Mapper004 {
     num_banks_prg: usize,
     num_banks_chr: usize,
 
+    prg_mod: u8,
+    chr_mod: u16,
+
     #[serde(with = "BigArray")]
     prg_ram: [u8; 8 * 1024],
     mirror_mode: Mirror,
@@ -34,6 +37,17 @@ impl Mapper004 {
         Mapper004 {
             num_banks_prg,
             num_banks_chr,
+
+            prg_mod: if num_banks_prg > 0 {
+                (num_banks_prg as u8) << 1
+            } else {
+                1
+            },
+            chr_mod: if num_banks_chr > 0 {
+                (num_banks_chr as u16) << 3
+            } else {
+                1
+            },
 
             prg_ram: [0; 8 * 1024],
             mirror_mode: Mirror::Horizontal,
@@ -92,8 +106,8 @@ impl Mapper for Mapper004 {
                 } else {
                     // update mapping
                     self.bank_reg[self.target_reg_idx] = match self.target_reg_idx {
-                        0..=5 => (data as u16 % ((self.num_banks_chr as u16) << 3)) as u8,
-                        6..=7 => data % ((self.num_banks_prg as u8) << 1),
+                        0..=5 => (data as u16 % self.chr_mod) as u8,
+                        6..=7 => data % self.prg_mod,
                         _ => unreachable!(),
                     };
 
@@ -171,15 +185,24 @@ impl Mapper for Mapper004 {
     fn ppu_map_read(&mut self, addr: u16) -> MapResult {
         match addr {
             0x0000..=0x1fff => {
-                let idx = (addr >> 10) as usize;
-                MapResult::MapAddr(self.chr_bank_offset[idx] + (addr & 0x03ff) as usize)
+                if self.num_banks_chr == 0 {
+                    MapResult::MapAddr(addr as usize)
+                } else {
+                    let idx = (addr >> 10) as usize;
+                    MapResult::MapAddr(self.chr_bank_offset[idx] + (addr & 0x03ff) as usize)
+                }
             }
             _ => MapResult::None,
         }
     }
 
-    fn ppu_map_write(&mut self, _addr: u16, _data: u8) -> MapResult {
-        MapResult::None
+    fn ppu_map_write(&mut self, addr: u16, _data: u8) -> MapResult {
+        if addr < 0x2000 && self.num_banks_chr == 0 {
+            // treat as RAM
+            MapResult::MapAddr(addr as usize)
+        } else {
+            MapResult::None
+        }
     }
 
     fn mirror(&self) -> Mirror {
