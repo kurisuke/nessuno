@@ -4,36 +4,18 @@ use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Datafile {
-    header: Header,
     game: Vec<Game>,
-}
-
-#[derive(Deserialize)]
-struct Header {
-    id: usize,
-    name: String,
-    description: String,
-    version: String,
-    author: String,
-    homepage: String,
-    url: String,
 }
 
 #[derive(Deserialize)]
 struct Game {
     name: String,
-    description: String,
     rom: Vec<Rom>,
 }
 
 #[derive(Deserialize)]
 struct Rom {
-    name: String,
-    size: usize,
-    crc: String,
-    md5: String,
     sha1: String,
-    sha256: String,
 }
 
 fn main() {
