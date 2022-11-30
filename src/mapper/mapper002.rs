@@ -1,7 +1,6 @@
 use super::{MapResult, Mapper};
 
 use serde::{Deserialize, Serialize};
-use typetag::serde;
 
 #[derive(Deserialize, Serialize)]
 pub struct Mapper002 {

@@ -2,7 +2,6 @@ use super::{MapResult, Mapper};
 use crate::cartridge::Mirror;
 
 use serde::{Deserialize, Serialize};
-use typetag::serde;
 
 #[derive(Deserialize, Serialize)]
 pub struct Mapper007 {
