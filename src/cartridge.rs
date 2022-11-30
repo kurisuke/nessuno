@@ -7,12 +7,12 @@ use std::io;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::mem;
 
+use ips::Patch;
 use serde::{Deserialize, Serialize};
 use sha1_smol::Sha1;
 
 #[derive(Deserialize, Serialize)]
 pub struct Cartridge {
-    pub filename: String,
     pub sha1_digest: String,
 
     mem_prg: Vec<u8>,
@@ -65,15 +65,45 @@ impl CartridgeHeader {
 }
 
 impl Cartridge {
-    pub fn new(filename: &str) -> Result<Cartridge, io::Error> {
-        let f = File::open(filename)?;
-        let mut reader = io::BufReader::new(f);
+    pub fn new(filename: &str, patch_filename: Option<&str>) -> Result<Cartridge, io::Error> {
+        if let Some(patch_filename) = patch_filename {
+            Self::new_with_patch(filename, patch_filename)
+        } else {
+            let f = File::open(filename)?;
+            let reader = io::BufReader::new(f);
 
+            Self::new_impl(reader)
+        }
+    }
+
+    fn new_with_patch(filename: &str, patch_filename: &str) -> Result<Cartridge, io::Error> {
+        let mut rom_buf = std::fs::read(filename)?;
+
+        let patch_contents = std::fs::read(patch_filename)?;
+        let patch = Patch::parse(&patch_contents)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid patch file"))?;
+
+        for hunk in patch.hunks() {
+            let start = hunk.offset();
+            let end = hunk.offset() + hunk.payload().len();
+            rom_buf[start..end].copy_from_slice(hunk.payload());
+        }
+
+        if let Some(truncation) = patch.truncation() {
+            rom_buf.truncate(truncation);
+        }
+
+        let rom = io::Cursor::new(rom_buf);
+        Self::new_impl(rom)
+    }
+
+    fn new_impl<R: Read + Seek>(mut reader: R) -> Result<Cartridge, io::Error> {
         let header = CartridgeHeader::load(&mut reader)?;
 
         let mut data = Vec::new();
         reader.read_to_end(&mut data)?;
         let sha1_digest = Sha1::from(&data).digest().to_string();
+
         let mut reader = Cursor::new(data);
 
         if header.mapper1 & 0x04 != 0 {
@@ -123,7 +153,6 @@ impl Cartridge {
                 };
 
                 Ok(Cartridge {
-                    filename: String::from(filename),
                     sha1_digest,
                     mem_prg,
                     mem_chr,

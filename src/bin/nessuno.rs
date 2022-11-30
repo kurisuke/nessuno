@@ -37,6 +37,7 @@ const AUDIO_BUFFER_SIZE: usize = (crate::audio::BUFFER_SIZE as usize) * 2;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     rom_file: String,
+    patch_file: Option<String>,
     #[clap(short, long)]
     debug: bool,
     #[clap(short, long)]
@@ -333,7 +334,7 @@ impl Nessuno {
         sample_rate: u32,
         tv_standard: TvStandard,
     ) -> Nessuno {
-        let save = SaveState::new(&cart.filename);
+        let save = SaveState::new(&cart.sha1_digest);
         let system = match save.load() {
             Some(system) if !reset => {
                 println!("Loaded save state from: {}", &save.save_file);
@@ -730,7 +731,7 @@ fn set_video_pixel(render_params: &VideoRenderParams, frame: &mut [u8], p: &SetP
 
 fn main() -> Result<(), io::Error> {
     let args = Args::parse();
-    let cart = Cartridge::new(&args.rom_file)?;
+    let cart = Cartridge::new(&args.rom_file, args.patch_file.as_deref())?;
 
     let mut window_title = String::from("nessuno");
     if let Some(rom_db) = romdb::load() {
