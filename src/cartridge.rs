@@ -4,7 +4,7 @@ use crate::mapper::{
 };
 use std::fs::File;
 use std::io;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::mem;
 
 use serde::{Deserialize, Serialize};
@@ -69,16 +69,15 @@ impl Cartridge {
         let f = File::open(filename)?;
         let mut reader = io::BufReader::new(f);
 
-        let mut data = Vec::new();
-        reader.seek(SeekFrom::Start(16))?;
-        reader.read_to_end(&mut data)?;
-        let sha1_digest = Sha1::from(&data).digest().to_string();
-
-        reader.rewind()?;
         let header = CartridgeHeader::load(&mut reader)?;
 
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data)?;
+        let sha1_digest = Sha1::from(&data).digest().to_string();
+        let mut reader = Cursor::new(data);
+
         if header.mapper1 & 0x04 != 0 {
-            let _junk = reader.seek_relative(512)?;
+            let _junk = reader.seek(SeekFrom::Current(512))?;
         }
         let mapper_id = ((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4);
         let hw_mirror = if header.mapper1 & 0x01 != 0 {
