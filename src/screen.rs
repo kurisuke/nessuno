@@ -49,7 +49,7 @@ impl<'a> Screen<'a> {
         };
 
         params.backend.init(Frame {
-            frame: pixels.get_frame(),
+            frame: pixels.get_frame_mut(),
             width: params.width,
             height: params.height,
         });
@@ -83,7 +83,7 @@ impl<'a> Screen<'a> {
             // Draw the current frame
             if let Event::RedrawRequested(_) = event {
                 self.params.backend.draw(Frame {
-                    frame: self.pixels.get_frame(),
+                    frame: self.pixels.get_frame_mut(),
                     width: self.params.width,
                     height: self.params.height,
                 });
@@ -97,7 +97,10 @@ impl<'a> Screen<'a> {
             // Handle input events
             if self.input.update(&event) {
                 // Close events
-                if self.input.key_pressed(VirtualKeyCode::Escape) || self.input.quit() {
+                if self.input.key_pressed(VirtualKeyCode::Escape)
+                    || self.input.close_requested()
+                    || self.input.destroyed()
+                {
                     self.params.backend.shutdown(true);
                     *control_flow = ControlFlow::Exit;
                     return;
@@ -123,9 +126,9 @@ impl<'a> Screen<'a> {
 
                 // Resize the window
                 if let Some(size) = self.input.window_resized() {
-                    self.pixels.resize_surface(size.width, size.height);
+                    self.pixels.resize_surface(size.width, size.height).unwrap();
                     self.params.backend.init(Frame {
-                        frame: self.pixels.get_frame(),
+                        frame: self.pixels.get_frame_mut(),
                         width: self.params.width,
                         height: self.params.height,
                     });
@@ -138,7 +141,7 @@ impl<'a> Screen<'a> {
 
                 self.params.backend.update(
                     Frame {
-                        frame: self.pixels.get_frame(),
+                        frame: self.pixels.get_frame_mut(),
                         width: self.params.width,
                         height: self.params.height,
                     },

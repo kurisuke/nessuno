@@ -1,11 +1,12 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Sample, SampleFormat, SampleRate, StreamConfig, SupportedBufferSize};
+use cpal::{Sample, SampleRate, StreamConfig, SupportedBufferSize};
 use crossbeam_channel::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
 pub const BUFFER_SIZE: u32 = 2048;
 const MIN_SAMPLE_RATE: u32 = 44100;
+const MIN_SAMPLE_SIZE: usize = 2;
 
 pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
     thread::spawn(move || {
@@ -20,6 +21,7 @@ pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
         let supported_config = supported_configs_range
             .find(|supported_config| {
                 supported_config.channels() == 1
+                    && supported_config.sample_format().sample_size() >= MIN_SAMPLE_SIZE
                     && match supported_config.buffer_size() {
                         SupportedBufferSize::Range { min, max } => {
                             min <= &BUFFER_SIZE && &BUFFER_SIZE <= max
@@ -54,7 +56,7 @@ pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
 
         let sample_callback = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
             for sample in data.iter_mut() {
-                *sample = Sample::from(&audio_recv.try_recv().unwrap_or(0.0f32));
+                *sample = Sample::from_sample(audio_recv.try_recv().unwrap_or(0.0f32));
             }
         };
 
@@ -65,12 +67,9 @@ pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
             )
         };
 
-        let stream = match sample_format {
-            SampleFormat::F32 => device.build_output_stream(&config, sample_callback, err_fn),
-            SampleFormat::I16 => device.build_output_stream(&config, sample_callback, err_fn),
-            SampleFormat::U16 => device.build_output_stream(&config, sample_callback, err_fn),
-        }
-        .unwrap();
+        let stream = device
+            .build_output_stream(&config, sample_callback, err_fn, None)
+            .unwrap();
 
         println!("Start audio...");
         stream.play().unwrap();
