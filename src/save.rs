@@ -46,7 +46,7 @@ impl SaveState {
 
     pub fn save(&self, system: &System) -> bool {
         let save_file_path = Path::new(&self.save_file);
-        let writer = BufWriter::new(File::create(&save_file_path).unwrap());
+        let writer = BufWriter::new(File::create(save_file_path).unwrap());
         let mut encoder = ZlibEncoder::new(writer, Compression::best());
         bincode::serialize_into(&mut encoder, &system).is_ok()
     }

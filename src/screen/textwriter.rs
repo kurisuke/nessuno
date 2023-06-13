@@ -54,7 +54,7 @@ impl TextWriter {
                         let py = (pos_y * self.font_params.char_size_y + y) as usize;
                         let px = (pos_x * self.font_params.char_size_x + x) as usize;
                         if px < self.screen_params.width && py < self.screen_params.height {
-                            let p = (py * self.screen_params.width as usize + px) * 4;
+                            let p = (py * self.screen_params.width + px) * 4;
                             frame[p..p + 4].copy_from_slice(bg);
                         }
                     }
@@ -75,7 +75,7 @@ impl TextWriter {
                             let py = (pos_y * self.font_params.char_size_y + start_y + y) as usize;
                             let px = (pos_x * self.font_params.char_size_x + start_x + x) as usize;
                             if px < self.screen_params.width && py < self.screen_params.height {
-                                let p = (py * self.screen_params.width as usize + px) * 4;
+                                let p = (py * self.screen_params.width + px) * 4;
                                 frame[p..p + 4].copy_from_slice(fg);
                             }
                         }

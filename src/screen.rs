@@ -49,7 +49,7 @@ impl<'a> Screen<'a> {
         };
 
         params.backend.init(Frame {
-            frame: pixels.get_frame_mut(),
+            frame: pixels.frame_mut(),
             width: params.width,
             height: params.height,
         });
@@ -83,7 +83,7 @@ impl<'a> Screen<'a> {
             // Draw the current frame
             if let Event::RedrawRequested(_) = event {
                 self.params.backend.draw(Frame {
-                    frame: self.pixels.get_frame_mut(),
+                    frame: self.pixels.frame_mut(),
                     width: self.params.width,
                     height: self.params.height,
                 });
@@ -128,7 +128,7 @@ impl<'a> Screen<'a> {
                 if let Some(size) = self.input.window_resized() {
                     self.pixels.resize_surface(size.width, size.height).unwrap();
                     self.params.backend.init(Frame {
-                        frame: self.pixels.get_frame_mut(),
+                        frame: self.pixels.frame_mut(),
                         width: self.params.width,
                         height: self.params.height,
                     });
@@ -141,7 +141,7 @@ impl<'a> Screen<'a> {
 
                 self.params.backend.update(
                     Frame {
-                        frame: self.pixels.get_frame_mut(),
+                        frame: self.pixels.frame_mut(),
                         width: self.params.width,
                         height: self.params.height,
                     },

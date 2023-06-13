@@ -30,9 +30,9 @@ impl Mapper for Mapper007 {
 
     fn cpu_map_read_ro(&self, addr: u16) -> MapResult {
         match addr {
-            0x8000..=0xffff => MapResult::MapAddr(
-                self.prg_bank_select as usize * 0x8000 + (addr & 0x7fff) as usize,
-            ),
+            0x8000..=0xffff => {
+                MapResult::MapAddr(self.prg_bank_select * 0x8000 + (addr & 0x7fff) as usize)
+            }
             _ => MapResult::None,
         }
     }

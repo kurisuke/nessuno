@@ -27,24 +27,24 @@ impl Mapper002 {
 impl Mapper for Mapper002 {
     fn cpu_map_read(&mut self, addr: u16) -> MapResult {
         match addr {
-            0x8000..=0xbfff => MapResult::MapAddr(
-                self.prg_bank_select_lo as usize * 0x4000 + (addr & 0x3fff) as usize,
-            ),
-            0xc000..=0xffff => MapResult::MapAddr(
-                self.prg_bank_select_hi as usize * 0x4000 + (addr & 0x3fff) as usize,
-            ),
+            0x8000..=0xbfff => {
+                MapResult::MapAddr(self.prg_bank_select_lo * 0x4000 + (addr & 0x3fff) as usize)
+            }
+            0xc000..=0xffff => {
+                MapResult::MapAddr(self.prg_bank_select_hi * 0x4000 + (addr & 0x3fff) as usize)
+            }
             _ => MapResult::None,
         }
     }
 
     fn cpu_map_read_ro(&self, addr: u16) -> MapResult {
         match addr {
-            0x8000..=0xbfff => MapResult::MapAddr(
-                self.prg_bank_select_lo as usize * 0x4000 + (addr & 0x3fff) as usize,
-            ),
-            0xc000..=0xffff => MapResult::MapAddr(
-                self.prg_bank_select_hi as usize * 0x4000 + (addr & 0x3fff) as usize,
-            ),
+            0x8000..=0xbfff => {
+                MapResult::MapAddr(self.prg_bank_select_lo * 0x4000 + (addr & 0x3fff) as usize)
+            }
+            0xc000..=0xffff => {
+                MapResult::MapAddr(self.prg_bank_select_hi * 0x4000 + (addr & 0x3fff) as usize)
+            }
             _ => MapResult::None,
         }
     }
