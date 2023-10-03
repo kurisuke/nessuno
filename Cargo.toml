@@ -8,20 +8,20 @@ edition = "2021"
 [dependencies]
 bdf-parser = { git = "https://github.com/embedded-graphics/bdf", rev = "a880098dae12ac279976736bd806b59eb3aba782" }
 bincode = "1.3.3"
-clap = { version = "4.3.3", features = ["derive"] }
+clap = { version = "4.4.6", features = ["derive"] }
 cpal = "0.15.2"
 crossbeam-channel = "0.5.8"
 directories = "5.0.1"
-flate2 = "1.0.26"
+flate2 = "1.0.27"
 gilrs = "0.10.2"
 ips = { path = "./ips" }
 pixels = "0.13.0"
-serde = "1.0.164"
+serde = "1.0.188"
 serde-big-array = "0.5.1"
 serde-xml-rs = "0.6.0"
 sha1_smol = "1.0.0"
-typetag = "0.2.8"
-winit = "0.28.6"
+typetag = "0.2.13"
+winit = "0.28.7"
 winit_input_helper = "0.14.1"
 
 [profile.release]
