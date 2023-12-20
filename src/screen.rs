@@ -5,8 +5,9 @@ use backend::{Frame, ScreenBackend};
 use pixels::{Error, Pixels, SurfaceTexture};
 use std::time::Instant;
 use winit::dpi::LogicalSize;
-use winit::event::{Event, VirtualKeyCode};
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::EventLoop;
+use winit::keyboard::KeyCode;
 use winit::window::{Fullscreen, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
@@ -29,7 +30,7 @@ pub struct ScreenParams<'a> {
 
 impl<'a> Screen<'a> {
     pub fn new(params: ScreenParams, fullscreen: bool) -> Result<Screen, Error> {
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new().unwrap();
         let input = WinitInputHelper::new();
         let window = {
             let size = LogicalSize::new(params.width as f64, params.height as f64);
@@ -79,76 +80,82 @@ impl<'a> Screen<'a> {
         }
 
         self.time = Instant::now();
-        self.event_loop.run(move |event, _, control_flow| {
-            // Draw the current frame
-            if let Event::RedrawRequested(_) = event {
-                self.params.backend.draw(Frame {
-                    frame: self.pixels.frame_mut(),
-                    width: self.params.width,
-                    height: self.params.height,
-                });
-                if self.pixels.render().is_err() {
-                    self.params.backend.shutdown(false);
-                    *control_flow = ControlFlow::Exit;
-                    return;
-                }
-            }
-
-            // Handle input events
-            if self.input.update(&event) {
-                // Close events
-                if self.input.key_pressed(VirtualKeyCode::Escape)
-                    || self.input.close_requested()
-                    || self.input.destroyed()
+        self.event_loop
+            .run(move |event, control_flow| {
+                // Draw the current frame
+                if let Event::WindowEvent {
+                    window_id: _,
+                    event: WindowEvent::RedrawRequested,
+                } = event
                 {
-                    self.params.backend.shutdown(true);
-                    *control_flow = ControlFlow::Exit;
-                    return;
-                }
-
-                if self.input.key_pressed(VirtualKeyCode::F11) {
-                    // toggle fullscreen
-                    self.fullscreen = !self.fullscreen;
-                    match self.fullscreen {
-                        true => {
-                            self.window.set_fullscreen(fullscreen_cfg.clone());
-                            self.window.set_cursor_visible(false);
-                        }
-                        false => {
-                            self.window.set_fullscreen(None);
-                            self.window.set_cursor_visible(true);
-                        }
-                    }
-                }
-
-                // Let other input be handled by backend
-                self.params.backend.handle_input(&self.input);
-
-                // Resize the window
-                if let Some(size) = self.input.window_resized() {
-                    self.pixels.resize_surface(size.width, size.height).unwrap();
-                    self.params.backend.init(Frame {
+                    self.params.backend.draw(Frame {
                         frame: self.pixels.frame_mut(),
                         width: self.params.width,
                         height: self.params.height,
                     });
+                    if self.pixels.render().is_err() {
+                        self.params.backend.shutdown(false);
+                        control_flow.exit();
+                        return;
+                    }
                 }
 
-                // Update internal state and request a redraw
-                let now = Instant::now();
-                let dt = now.duration_since(self.time).as_secs_f64();
-                self.time = now;
+                // Handle input events
+                if self.input.update(&event) {
+                    // Close events
+                    if self.input.key_pressed(KeyCode::Escape)
+                        || self.input.close_requested()
+                        || self.input.destroyed()
+                    {
+                        self.params.backend.shutdown(true);
+                        control_flow.exit();
+                        return;
+                    }
 
-                self.params.backend.update(
-                    Frame {
-                        frame: self.pixels.frame_mut(),
-                        width: self.params.width,
-                        height: self.params.height,
-                    },
-                    dt,
-                );
-                self.window.request_redraw();
-            }
-        });
+                    if self.input.key_pressed(KeyCode::F11) {
+                        // toggle fullscreen
+                        self.fullscreen = !self.fullscreen;
+                        match self.fullscreen {
+                            true => {
+                                self.window.set_fullscreen(fullscreen_cfg.clone());
+                                self.window.set_cursor_visible(false);
+                            }
+                            false => {
+                                self.window.set_fullscreen(None);
+                                self.window.set_cursor_visible(true);
+                            }
+                        }
+                    }
+
+                    // Let other input be handled by backend
+                    self.params.backend.handle_input(&self.input);
+
+                    // Resize the window
+                    if let Some(size) = self.input.window_resized() {
+                        self.pixels.resize_surface(size.width, size.height).unwrap();
+                        self.params.backend.init(Frame {
+                            frame: self.pixels.frame_mut(),
+                            width: self.params.width,
+                            height: self.params.height,
+                        });
+                    }
+
+                    // Update internal state and request a redraw
+                    let now = Instant::now();
+                    let dt = now.duration_since(self.time).as_secs_f64();
+                    self.time = now;
+
+                    self.params.backend.update(
+                        Frame {
+                            frame: self.pixels.frame_mut(),
+                            width: self.params.width,
+                            height: self.params.height,
+                        },
+                        dt,
+                    );
+                    self.window.request_redraw();
+                }
+            })
+            .unwrap();
     }
 }

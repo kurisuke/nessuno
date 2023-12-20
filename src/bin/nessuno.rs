@@ -13,7 +13,7 @@ use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
 use nessuno::system::{System, TvStandard};
 use std::io;
-use winit::event::VirtualKeyCode;
+use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
 const SCREEN_WIDTH: u32 = 960;
@@ -531,20 +531,20 @@ impl ScreenBackend for Nessuno {
         }
 
         // DEBUG KEYS
-        if input.key_pressed(VirtualKeyCode::Space) {
+        if input.key_pressed(KeyCode::Space) {
             self.run = !self.run;
             if !self.run {
                 self.t_residual = 0f64;
             }
-        } else if input.key_pressed(VirtualKeyCode::R) && input.held_control() {
+        } else if input.key_pressed(KeyCode::KeyR) && input.held_control() {
             self.action = Some(UserAction::Reset);
-        } else if input.key_pressed(VirtualKeyCode::F) {
+        } else if input.key_pressed(KeyCode::KeyF) {
             self.action = Some(UserAction::Frame);
-        } else if input.key_pressed(VirtualKeyCode::S) {
+        } else if input.key_pressed(KeyCode::KeyS) {
             self.action = Some(UserAction::Step);
-        } else if input.key_pressed(VirtualKeyCode::T) {
+        } else if input.key_pressed(KeyCode::KeyT) {
             self.display_oam = !self.display_oam;
-        } else if input.key_pressed(VirtualKeyCode::P) {
+        } else if input.key_pressed(KeyCode::KeyP) {
             self.palette_selected += 1;
             self.palette_selected &= 0x07;
             self.action = Some(UserAction::PaletteSelect);
@@ -681,12 +681,12 @@ impl ScreenBackend for NessunoMin {
         }
 
         // DEBUG KEYS
-        if input.key_pressed(VirtualKeyCode::Space) {
+        if input.key_pressed(KeyCode::Space) {
             self.run = !self.run;
             if !self.run {
                 self.t_residual = 0f64;
             }
-        } else if input.key_pressed(VirtualKeyCode::R) && input.held_control() {
+        } else if input.key_pressed(KeyCode::KeyR) && input.held_control() {
             self.system.reset();
             self.run = true;
         }

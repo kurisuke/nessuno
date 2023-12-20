@@ -3,7 +3,7 @@ use nessuno::screen::backend::{Frame, ScreenBackend};
 use nessuno::screen::textwriter::{TextScreenParams, TextWriter};
 use nessuno::screen::{Screen, ScreenParams};
 use nessuno::system_debug_cpu::SystemDebugCpu;
-use winit::event::VirtualKeyCode;
+use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
 const SCREEN_WIDTH: u32 = 960;
@@ -238,13 +238,13 @@ impl ScreenBackend for DebugCpu {
     }
 
     fn handle_input(&mut self, input: &WinitInputHelper) {
-        if input.key_pressed(VirtualKeyCode::R) {
+        if input.key_pressed(KeyCode::KeyR) {
             self.action = Some(UserAction::Reset);
-        } else if input.key_pressed(VirtualKeyCode::I) {
+        } else if input.key_pressed(KeyCode::KeyI) {
             self.action = Some(UserAction::Irq);
-        } else if input.key_pressed(VirtualKeyCode::N) {
+        } else if input.key_pressed(KeyCode::KeyN) {
             self.action = Some(UserAction::Nmi);
-        } else if input.key_pressed(VirtualKeyCode::Space) {
+        } else if input.key_pressed(KeyCode::Space) {
             self.action = Some(UserAction::Step);
         }
     }

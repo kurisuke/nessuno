@@ -1,7 +1,7 @@
 use crate::controller::ControllerInput;
 use gilrs::{Button, Gilrs};
 use std::collections::HashSet;
-use winit::event::VirtualKeyCode;
+use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
 pub struct InputGilrs {
@@ -92,68 +92,68 @@ impl InputKeyboard {
     ) -> Option<(Vec<ControllerInput>, Vec<ControllerInput>)> {
         let mut updated = false;
 
-        if input.key_pressed(VirtualKeyCode::Left) {
+        if input.key_pressed(KeyCode::ArrowLeft) {
             self.pushed_buttons.insert(ControllerInput::Left);
             updated = true;
         }
-        if input.key_pressed(VirtualKeyCode::Right) {
+        if input.key_pressed(KeyCode::ArrowRight) {
             self.pushed_buttons.insert(ControllerInput::Right);
             updated = true;
         }
-        if input.key_pressed(VirtualKeyCode::Up) {
+        if input.key_pressed(KeyCode::ArrowUp) {
             self.pushed_buttons.insert(ControllerInput::Up);
             updated = true;
         }
-        if input.key_pressed(VirtualKeyCode::Down) {
+        if input.key_pressed(KeyCode::ArrowDown) {
             self.pushed_buttons.insert(ControllerInput::Down);
             updated = true;
         }
-        if input.key_pressed(VirtualKeyCode::Key1) {
+        if input.key_pressed(KeyCode::Digit1) {
             self.pushed_buttons.insert(ControllerInput::B);
             updated = true;
         }
-        if input.key_pressed(VirtualKeyCode::Key2) {
+        if input.key_pressed(KeyCode::Digit2) {
             self.pushed_buttons.insert(ControllerInput::A);
             updated = true;
         }
-        if input.key_pressed(VirtualKeyCode::Key3) {
+        if input.key_pressed(KeyCode::Digit3) {
             self.pushed_buttons.insert(ControllerInput::Select);
             updated = true;
         }
-        if input.key_pressed(VirtualKeyCode::Key4) {
+        if input.key_pressed(KeyCode::Digit4) {
             self.pushed_buttons.insert(ControllerInput::Start);
             updated = true;
         }
 
-        if input.key_released(VirtualKeyCode::Left) {
+        if input.key_released(KeyCode::ArrowLeft) {
             self.pushed_buttons.remove(&ControllerInput::Left);
             updated = true;
         }
-        if input.key_released(VirtualKeyCode::Right) {
+        if input.key_released(KeyCode::ArrowRight) {
             self.pushed_buttons.remove(&ControllerInput::Right);
             updated = true;
         }
-        if input.key_released(VirtualKeyCode::Up) {
+        if input.key_released(KeyCode::ArrowUp) {
             self.pushed_buttons.remove(&ControllerInput::Up);
             updated = true;
         }
-        if input.key_released(VirtualKeyCode::Down) {
+        if input.key_released(KeyCode::ArrowDown) {
             self.pushed_buttons.remove(&ControllerInput::Down);
             updated = true;
         }
-        if input.key_released(VirtualKeyCode::Key1) {
+        if input.key_released(KeyCode::Digit1) {
             self.pushed_buttons.remove(&ControllerInput::B);
             updated = true;
         }
-        if input.key_released(VirtualKeyCode::Key2) {
+        if input.key_released(KeyCode::Digit2) {
             self.pushed_buttons.remove(&ControllerInput::A);
             updated = true;
         }
-        if input.key_released(VirtualKeyCode::Key3) {
+        if input.key_released(KeyCode::Digit3) {
             self.pushed_buttons.remove(&ControllerInput::Select);
             updated = true;
         }
-        if input.key_released(VirtualKeyCode::Key4) {
+        if input.key_released(KeyCode::Digit4) {
             self.pushed_buttons.remove(&ControllerInput::Start);
             updated = true;
         }
