@@ -3,6 +3,7 @@ pub mod textwriter;
 
 use backend::{Frame, ScreenBackend};
 use pixels::{Error, Pixels, SurfaceTexture};
+use std::sync::Arc;
 use std::time::Instant;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
@@ -13,9 +14,9 @@ use winit_input_helper::WinitInputHelper;
 
 pub struct Screen<'a> {
     params: ScreenParams<'a>,
-    window: Window,
+    window: Arc<Window>,
     input: WinitInputHelper,
-    pixels: Pixels,
+    pixels: Pixels<'static>,
     event_loop: EventLoop<()>,
     time: Instant,
     fullscreen: bool,
@@ -28,11 +29,11 @@ pub struct ScreenParams<'a> {
     pub backend: Box<dyn ScreenBackend>,
 }
 
-impl<'a> Screen<'a> {
+impl Screen<'_> {
     pub fn new(params: ScreenParams, fullscreen: bool) -> Result<Screen, Error> {
         let event_loop = EventLoop::new().unwrap();
         let input = WinitInputHelper::new();
-        let window = {
+        let window = Arc::new({
             let size = LogicalSize::new(params.width as f64, params.height as f64);
             WindowBuilder::new()
                 .with_title(params.title)
@@ -40,12 +41,12 @@ impl<'a> Screen<'a> {
                 .with_min_inner_size(size)
                 .build(&event_loop)
                 .unwrap()
-        };
+        });
 
         let mut pixels = {
             let window_size = window.inner_size();
             let surface_texture =
-                SurfaceTexture::new(window_size.width, window_size.height, &window);
+                SurfaceTexture::new(window_size.width, window_size.height, window.clone());
             Pixels::new(params.width, params.height, surface_texture)?
         };
 

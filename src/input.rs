@@ -29,6 +29,7 @@ impl InputGilrs {
             id: _,
             event,
             time: _,
+            ..
         }) = self.gilrs.next_event()
         {
             match &event {
