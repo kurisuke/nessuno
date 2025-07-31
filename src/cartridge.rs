@@ -1,6 +1,6 @@
 use crate::mapper::{
-    mapper000::Mapper000, mapper001::Mapper001, mapper002::Mapper002, mapper003::Mapper003,
-    mapper004::Mapper004, mapper007::Mapper007, mapper009::Mapper009, MapResult, Mapper,
+    MapResult, Mapper, mapper000::Mapper000, mapper001::Mapper001, mapper002::Mapper002,
+    mapper003::Mapper003, mapper004::Mapper004, mapper007::Mapper007, mapper009::Mapper009,
 };
 use std::fs::File;
 use std::io;
@@ -127,12 +127,9 @@ impl Cartridge {
             4 => Box::new(Mapper004::new(num_banks_prg, num_banks_chr)),
             7 => Box::new(Mapper007::new(num_banks_prg, num_banks_chr)),
             9 => Box::new(Mapper009::new(num_banks_prg, num_banks_chr)),
-            _ => panic!("Unsupported mapper: {:03}", mapper_id),
+            _ => panic!("Unsupported mapper: {mapper_id:03}"),
         };
-        println!(
-            "Mapper: {:03}, #prg: {}, #chr: {}",
-            mapper_id, num_banks_prg, num_banks_chr
-        );
+        println!("Mapper: {mapper_id:03}, #prg: {num_banks_prg}, #chr: {num_banks_chr}");
 
         let file_type = 1;
         match file_type {

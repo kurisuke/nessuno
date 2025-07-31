@@ -60,12 +60,7 @@ pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
             }
         };
 
-        let err_fn = |err| {
-            println!(
-                "ERROR: an error occurred on the output audio stream: {}",
-                err
-            )
-        };
+        let err_fn = |err| println!("ERROR: an error occurred on the output audio stream: {err}");
 
         let stream = device
             .build_output_stream(&config, sample_callback, err_fn, None)

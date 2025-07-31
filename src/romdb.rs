@@ -1,7 +1,7 @@
 use directories::BaseDirs;
+use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use flate2::Compression;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};

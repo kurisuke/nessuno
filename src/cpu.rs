@@ -1,7 +1,7 @@
 mod instr;
 
 use crate::bus::CpuBus;
-use instr::{AddrMode, Instr, Op, INSTR_LOOKUP};
+use instr::{AddrMode, INSTR_LOOKUP, Instr, Op};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::num::Wrapping;
@@ -752,7 +752,7 @@ impl Cpu {
         let mut disasm = BTreeMap::new();
         while addr <= addr_stop as u32 {
             let line_addr = addr as u16;
-            let mut s = format!("${:04x}: ", addr);
+            let mut s = format!("${addr:04x}: ");
 
             let opcode = bus.cpu_read_ro(addr as u16);
             addr += 1;
@@ -767,22 +767,22 @@ impl Cpu {
                 AddrMode::Imm => {
                     let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
-                    format!("#${:02x} {{IMM}}", value)
+                    format!("#${value:02x} {{IMM}}")
                 }
                 AddrMode::Zp0 => {
                     let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
-                    format!("${:02x} {{ZP0}}", value)
+                    format!("${value:02x} {{ZP0}}")
                 }
                 AddrMode::Zpx => {
                     let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
-                    format!("${:02x}, X {{ZPX}}", value)
+                    format!("${value:02x}, X {{ZPX}}")
                 }
                 AddrMode::Zpy => {
                     let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
-                    format!("${:02x}, Y {{ZPY}}", value)
+                    format!("${value:02x}, Y {{ZPY}}")
                 }
                 AddrMode::Rel => {
                     let mut value = bus.cpu_read_ro(addr as u16) as u16;
@@ -791,7 +791,7 @@ impl Cpu {
                     }
                     addr += 1;
                     let value_abs = (Wrapping(addr as u16) + Wrapping(value)).0;
-                    format!("${:02x} [${:04x}] {{REL}}", value, value_abs)
+                    format!("${value:02x} [${value_abs:04x}] {{REL}}")
                 }
                 AddrMode::Abs => {
                     let lo = bus.cpu_read_ro(addr as u16) as u16;
@@ -799,7 +799,7 @@ impl Cpu {
                     let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
-                    format!("${:04x} {{ABS}}", value)
+                    format!("${value:04x} {{ABS}}")
                 }
                 AddrMode::Abx => {
                     let lo = bus.cpu_read_ro(addr as u16) as u16;
@@ -807,7 +807,7 @@ impl Cpu {
                     let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
-                    format!("${:04x}, X {{ABX}}", value)
+                    format!("${value:04x}, X {{ABX}}")
                 }
                 AddrMode::Aby => {
                     let lo = bus.cpu_read_ro(addr as u16) as u16;
@@ -815,7 +815,7 @@ impl Cpu {
                     let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
-                    format!("${:04x}, Y {{ABY}}", value)
+                    format!("${value:04x}, Y {{ABY}}")
                 }
                 AddrMode::Ind => {
                     let lo = bus.cpu_read_ro(addr as u16) as u16;
@@ -823,17 +823,17 @@ impl Cpu {
                     let hi = bus.cpu_read_ro(addr as u16) as u16;
                     addr += 1;
                     let value = (hi << 8) | lo;
-                    format!("(${:04x}) {{IND}}", value)
+                    format!("(${value:04x}) {{IND}}")
                 }
                 AddrMode::Izx => {
                     let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
-                    format!("(${:02x}), X {{IZX}}", value)
+                    format!("(${value:02x}), X {{IZX}}")
                 }
                 AddrMode::Izy => {
                     let value = bus.cpu_read_ro(addr as u16);
                     addr += 1;
-                    format!("(${:02x}), Y {{IZY}}", value)
+                    format!("(${value:02x}), Y {{IZY}}")
                 }
             };
             s.push_str(&s_addr);

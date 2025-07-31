@@ -1,8 +1,8 @@
 use crate::system::System;
 use directories::BaseDirs;
+use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
-use flate2::Compression;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
@@ -48,7 +48,7 @@ impl SaveState {
         let save_file_path = Path::new(&self.save_file);
         let writer = BufWriter::new(File::create(save_file_path).unwrap());
         let mut encoder = ZlibEncoder::new(writer, Compression::best());
-        bincode::serde::encode_into_std_write(&system, &mut encoder, bincode::config::legacy())
+        bincode::serde::encode_into_std_write(system, &mut encoder, bincode::config::legacy())
             .is_ok()
     }
 }

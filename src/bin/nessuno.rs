@@ -1,11 +1,11 @@
 use clap::Parser;
-use crossbeam_channel::{bounded, Sender};
+use crossbeam_channel::{Sender, bounded};
 use nessuno::audio;
 use nessuno::cartridge::Cartridge;
 use nessuno::cpu::Flag;
 use nessuno::input::{InputGilrs, InputKeyboard};
-use nessuno::ppu::palette::PALETTE_MAGNUM_FBX;
 use nessuno::ppu::SetPixel;
+use nessuno::ppu::palette::PALETTE_MAGNUM_FBX;
 use nessuno::romdb;
 use nessuno::save::SaveState;
 use nessuno::screen::backend::{Frame, ScreenBackend};
@@ -202,7 +202,7 @@ impl Nessuno {
                 frame,
                 pos_x,
                 pos_y + range as i32 + i as i32 + 1,
-                &format!("{:30}", line),
+                &format!("{line:30}"),
                 &FG_COLOR,
                 &BG_COLOR,
             );
@@ -220,7 +220,7 @@ impl Nessuno {
                 frame,
                 pos_x,
                 pos_y + range as i32 - i as i32 - 1,
-                &format!("{:30}", line),
+                &format!("{line:30}"),
                 &FG_COLOR,
                 &BG_COLOR,
             );
@@ -736,8 +736,8 @@ fn main() -> Result<(), io::Error> {
     let mut window_title = String::from("nessuno");
     if let Some(rom_db) = romdb::load() {
         if let Some(rom_name) = rom_db.get(&cart.sha1_digest) {
-            println!("ROM name: {}", rom_name);
-            window_title = format!("{} [nessuno]", rom_name);
+            println!("ROM name: {rom_name}");
+            window_title = format!("{rom_name} [nessuno]");
         }
     }
 

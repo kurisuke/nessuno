@@ -163,7 +163,7 @@ impl DebugCpu {
                 frame,
                 pos_x,
                 pos_y + range as i32 + i as i32 + 1,
-                &format!("{:30}", line),
+                &format!("{line:30}"),
                 &FG_COLOR,
                 &BG_COLOR,
             );
@@ -181,7 +181,7 @@ impl DebugCpu {
                 frame,
                 pos_x,
                 pos_y + range as i32 - i as i32 - 1,
-                &format!("{:30}", line),
+                &format!("{line:30}"),
                 &FG_COLOR,
                 &BG_COLOR,
             );
