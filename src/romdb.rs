@@ -16,7 +16,7 @@ pub fn save(db: &RomDb) -> bool {
     p.push("rom.db");
     let writer = BufWriter::new(File::create(&p).unwrap());
     let mut encoder = ZlibEncoder::new(writer, Compression::best());
-    bincode::serialize_into(&mut encoder, db).is_ok()
+    bincode::serde::encode_into_std_write(db, &mut encoder, bincode::config::legacy()).is_ok()
 }
 
 pub fn load() -> Option<RomDb> {
@@ -26,7 +26,7 @@ pub fn load() -> Option<RomDb> {
     if p.is_file() {
         let reader = BufReader::new(File::open(&p).unwrap());
         let mut decoder = ZlibDecoder::new(reader);
-        bincode::deserialize_from(&mut decoder).ok()
+        bincode::serde::decode_from_std_read(&mut decoder, bincode::config::legacy()).ok()
     } else {
         None
     }

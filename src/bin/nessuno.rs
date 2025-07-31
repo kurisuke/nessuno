@@ -349,7 +349,7 @@ impl Nessuno {
         Nessuno {
             system,
             text_writer: TextWriter::new(
-                include_bytes!("../../res/cozette.bdf"),
+                include_str!("../../res/cozette.bdf"),
                 TextScreenParams {
                     width: SCREEN_WIDTH as usize,
                     height: SCREEN_HEIGHT as usize,

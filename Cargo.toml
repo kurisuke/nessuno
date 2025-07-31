@@ -6,21 +6,21 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bdf-parser = { git = "https://github.com/embedded-graphics/bdf", rev = "a880098dae12ac279976736bd806b59eb3aba782" }
-bincode = "1.3.3"
-clap = { version = "4.5.26", features = ["derive"] }
-cpal = "0.15.3"
-crossbeam-channel = "0.5.14"
-directories = "5.0.1"
-flate2 = "1.0.35"
+bdf-parser = { git = "https://github.com/embedded-graphics/bdf", rev = "667ad278ad267f80cf493defacedce75c11338b6" }
+bincode = { version = "2.0.1", features = ["serde"] }
+clap = { version = "4.5.42", features = ["derive"] }
+cpal = "0.16.0"
+crossbeam-channel = "0.5.15"
+directories = "6.0.0"
+flate2 = "1.1.2"
 gilrs = "0.11.0"
 ips = { path = "./ips" }
 pixels = "0.15.0"
-serde = "1.0.217"
+serde = "1.0.219"
 serde-big-array = "0.5.1"
-serde-xml-rs = "0.6.0"
+serde-xml-rs = "0.8.1"
 sha1_smol = "1.0.1"
-typetag = "0.2.19"
+typetag = "0.2.20"
 winit = { version = "0.29.15", features = ["rwh_06"] }
 winit_input_helper = "0.16.0"
 

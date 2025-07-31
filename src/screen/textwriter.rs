@@ -1,7 +1,7 @@
-use bdf_parser::{BdfFont, Property};
+use bdf_parser::{Font, Property};
 
 pub struct TextWriter {
-    font: BdfFont,
+    font: Font,
     font_params: FontParams,
     screen_params: TextScreenParams,
 }
@@ -18,14 +18,28 @@ struct FontParams {
 }
 
 impl TextWriter {
-    pub fn new(font_input: &[u8], screen_params: TextScreenParams) -> TextWriter {
-        let font = BdfFont::parse(font_input).unwrap();
+    pub fn new(font_input: &str, screen_params: TextScreenParams) -> TextWriter {
+        let font = Font::parse(font_input).unwrap();
         let font_params = FontParams {
-            char_size_x: font.properties.try_get::<i32>(Property::NormSpace).unwrap() + 1,
-            char_size_y: font.properties.try_get::<i32>(Property::PixelSize).unwrap() + 1,
+            char_size_x: font
+                .metadata
+                .properties
+                .try_get::<i32>(Property::NormSpace)
+                .unwrap()
+                .unwrap()
+                + 1,
+            char_size_y: font
+                .metadata
+                .properties
+                .try_get::<i32>(Property::PixelSize)
+                .unwrap()
+                .unwrap()
+                + 1,
             char_ascent: font
+                .metadata
                 .properties
                 .try_get::<i32>(Property::FontAscent)
+                .unwrap()
                 .unwrap(),
         };
 
@@ -71,7 +85,7 @@ impl TextWriter {
 
                 for y in 0..glyph.bounding_box.size.y {
                     for x in 0..glyph.bounding_box.size.x {
-                        if glyph.pixel(x as usize, y as usize) {
+                        if glyph.pixel(x as usize, y as usize).unwrap() {
                             let py = (pos_y * self.font_params.char_size_y + start_y + y) as usize;
                             let px = (pos_x * self.font_params.char_size_x + start_x + x) as usize;
                             if px < self.screen_params.width && py < self.screen_params.height {

@@ -38,7 +38,7 @@ impl SaveState {
         if save_file_path.is_file() {
             let reader = BufReader::new(File::open(&self.save_file).unwrap());
             let mut decoder = ZlibDecoder::new(reader);
-            bincode::deserialize_from(&mut decoder).ok()
+            bincode::serde::decode_from_std_read(&mut decoder, bincode::config::legacy()).ok()
         } else {
             None
         }
@@ -48,6 +48,7 @@ impl SaveState {
         let save_file_path = Path::new(&self.save_file);
         let writer = BufWriter::new(File::create(save_file_path).unwrap());
         let mut encoder = ZlibEncoder::new(writer, Compression::best());
-        bincode::serialize_into(&mut encoder, &system).is_ok()
+        bincode::serde::encode_into_std_write(&system, &mut encoder, bincode::config::legacy())
+            .is_ok()
     }
 }
