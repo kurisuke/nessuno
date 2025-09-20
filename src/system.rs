@@ -130,7 +130,7 @@ impl System {
         self.bus.apu.clock();
 
         // CPU cycle if applicable. CPU runs at 1/3 of PPU rate
-        if self.clock_counter % 3 == 0 {
+        if self.clock_counter.is_multiple_of(3) {
             if self.bus.dma_transfer {
                 // CPU interrupted by DMA, advance DMA
                 self.handle_dma_transfer();
@@ -244,7 +244,7 @@ impl System {
             if self.clock_counter % 2 == 1 {
                 self.bus.dma_start_wait = false;
             }
-        } else if self.clock_counter % 2 == 0 {
+        } else if self.clock_counter.is_multiple_of(2) {
             // even cycle: read from cpu
             self.bus.dma_data = self
                 .bus

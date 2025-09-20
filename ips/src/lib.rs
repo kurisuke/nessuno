@@ -47,7 +47,7 @@ pub struct Patch<'a> {
 
 impl<'a> Patch<'a> {
     /// Parses an IPS patch from bytes.
-    pub fn parse(input: &[u8]) -> Result<Patch, Error> {
+    pub fn parse(input: &[u8]) -> Result<Patch<'_>, Error> {
         match ips(input) {
             Ok((_, patch)) => Ok(patch),
             Err(e) => Err(Error(e.to_string())),
@@ -96,7 +96,7 @@ impl<'a> Hunk<'a> {
     }
 }
 
-fn ips(input: &[u8]) -> IResult<&[u8], Patch> {
+fn ips(input: &[u8]) -> IResult<&[u8], Patch<'_>> {
     let (input, _) = tag(b"PATCH")(input)?;
     let (input, hunks) = many0(hunk)(input)?;
     let (input, _) = tag(b"EOF")(input)?;
@@ -106,7 +106,7 @@ fn ips(input: &[u8]) -> IResult<&[u8], Patch> {
     Ok((input, Patch { hunks, truncation }))
 }
 
-fn hunk(input: &[u8]) -> IResult<&[u8], Hunk> {
+fn hunk(input: &[u8]) -> IResult<&[u8], Hunk<'_>> {
     let (input, offset) = be_int(3)(input)?;
     let (input, len) = be_int(2)(input)?;
 

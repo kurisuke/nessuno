@@ -82,7 +82,7 @@ pub struct Instr<'a> {
 }
 
 impl Instr<'_> {
-    const fn new(name: &str, op: Op, addr_mode: AddrMode, cycles: u8) -> Instr {
+    const fn new(name: &str, op: Op, addr_mode: AddrMode, cycles: u8) -> Instr<'_> {
         Instr {
             name,
             op,

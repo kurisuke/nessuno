@@ -161,11 +161,11 @@ impl FrameCounter {
         };
         self.ppu_clock_counter += 1;
 
-        if self.ppu_clock_counter % 3 == 0 {
+        if self.ppu_clock_counter.is_multiple_of(3) {
             clock_events.cpu_cycle = true;
         }
 
-        if self.ppu_clock_counter % 6 == 0 {
+        if self.ppu_clock_counter.is_multiple_of(6) {
             clock_events.apu_cycle = true;
         }
 

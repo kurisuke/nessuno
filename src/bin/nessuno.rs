@@ -385,10 +385,8 @@ impl Nessuno {
             if let Some(p) = clock_res.set_pixel {
                 set_video_pixel(&self.render_params, frame, &p);
             }
-            if send_audio {
-                if let Some(s) = clock_res.audio_sample {
-                    self.audio_send.try_send(s).unwrap_or(());
-                }
+            if send_audio && let Some(s) = clock_res.audio_sample {
+                self.audio_send.try_send(s).unwrap_or(());
             }
             if clock_res.frame_complete {
                 break clock_res.cpu_complete;
@@ -401,10 +399,8 @@ impl Nessuno {
                 if let Some(p) = clock_res.set_pixel {
                     set_video_pixel(&self.render_params, frame, &p);
                 }
-                if send_audio {
-                    if let Some(s) = clock_res.audio_sample {
-                        self.audio_send.try_send(s).unwrap();
-                    }
+                if send_audio && let Some(s) = clock_res.audio_sample {
+                    self.audio_send.try_send(s).unwrap();
                 }
                 cpu_complete = clock_res.cpu_complete;
             }
@@ -734,11 +730,11 @@ fn main() -> Result<(), io::Error> {
     let cart = Cartridge::new(&args.rom_file, args.patch_file.as_deref())?;
 
     let mut window_title = String::from("nessuno");
-    if let Some(rom_db) = romdb::load() {
-        if let Some(rom_name) = rom_db.get(&cart.sha1_digest) {
-            println!("ROM name: {rom_name}");
-            window_title = format!("{rom_name} [nessuno]");
-        }
+    if let Some(rom_db) = romdb::load()
+        && let Some(rom_name) = rom_db.get(&cart.sha1_digest)
+    {
+        println!("ROM name: {rom_name}");
+        window_title = format!("{rom_name} [nessuno]");
     }
 
     let (audio_send, audio_recv) = bounded(AUDIO_BUFFER_SIZE);
