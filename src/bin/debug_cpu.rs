@@ -285,8 +285,7 @@ fn main() {
             backend: Box::new(DebugCpu::new()),
         },
         false,
-    )
-    .unwrap();
+    );
 
     screen.run();
 }

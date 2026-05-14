@@ -765,7 +765,6 @@ fn main() -> Result<(), io::Error> {
             },
             args.fullscreen,
         )
-        .unwrap()
     } else {
         Screen::new(
             ScreenParams {
@@ -782,7 +781,6 @@ fn main() -> Result<(), io::Error> {
             },
             args.fullscreen,
         )
-        .unwrap()
     };
 
     screen.run();

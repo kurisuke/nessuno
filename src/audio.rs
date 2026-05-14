@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Sample, SampleRate, StreamConfig, SupportedBufferSize};
+use cpal::{Sample, StreamConfig, SupportedBufferSize};
 use crossbeam_channel::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
@@ -35,8 +35,8 @@ pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
             SupportedBufferSize::Range { min: _, max: _ } => cpal::BufferSize::Fixed(BUFFER_SIZE),
             SupportedBufferSize::Unknown => cpal::BufferSize::Default,
         };
-        let selected_sample_rate = if min_sample_rate.0 <= MIN_SAMPLE_RATE {
-            SampleRate(MIN_SAMPLE_RATE)
+        let selected_sample_rate = if min_sample_rate <= MIN_SAMPLE_RATE {
+            MIN_SAMPLE_RATE
         } else {
             min_sample_rate
         };
@@ -49,10 +49,10 @@ pub fn run(audio_recv: Receiver<f32>, sample_rate_send: Sender<u32>) {
 
         println!(
             "samplerate: {}, format: {:?}, channels: {}",
-            selected_sample_rate.0, sample_format, num_channels
+            selected_sample_rate, sample_format, num_channels
         );
 
-        sample_rate_send.send(selected_sample_rate.0).unwrap();
+        sample_rate_send.send(selected_sample_rate).unwrap();
 
         let sample_callback = move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
             for sample in data.iter_mut() {

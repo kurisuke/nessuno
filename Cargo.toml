@@ -7,22 +7,22 @@ edition = "2024"
 
 [dependencies]
 bdf-parser = { git = "https://github.com/embedded-graphics/bdf", rev = "667ad278ad267f80cf493defacedce75c11338b6" }
-clap = { version = "4.5.42", features = ["derive"] }
-cpal = "0.16.0"
+clap = { version = "4.6.1", features = ["derive"] }
+cpal = "0.17.3"
 crossbeam-channel = "0.5.15"
 directories = "6.0.0"
-flate2 = "1.1.2"
-gilrs = "0.11.0"
+flate2 = "1.1.9"
+gilrs = "0.11.1"
 ips = { path = "./ips" }
-pixels = "0.15.0"
+pixels = "0.17.1"
 postcard = { version = "1.1.3", features = ["use-std"] }
-serde = "1.0.219"
+serde = "1.0.228"
 serde-big-array = "0.5.1"
-serde-xml-rs = "0.8.1"
+serde-xml-rs = "0.8.2"
 sha1_smol = "1.0.1"
-typetag = "0.2.20"
-winit = { version = "0.29.15", features = ["rwh_06"] }
-winit_input_helper = "0.16.0"
+typetag = "0.2.21"
+winit = { version = "0.30.13", features = ["rwh_06"] }
+winit_input_helper = "0.17.0"
 
 [profile.release]
 lto = true
