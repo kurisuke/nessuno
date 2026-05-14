@@ -4,7 +4,6 @@ use crate::cartridge::Mirror;
 
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
-use typetag::serde;
 
 #[derive(Deserialize, Serialize)]
 pub struct Mapper001 {
